@@ -1,0 +1,172 @@
+Sub FinalizeSafeBarcodeReportPortraitFullWidth()
+    Dim ws As Worksheet
+    Dim lastCol As Long, lastRow As Long
+    Dim i As Long
+    Dim keepCol1 As String, keepCol2 As String, keepCol3 As String
+    Dim importantColName As String
+    Dim sortKeyRange As Range
+    Dim importantColNum As Long
+    Dim luColRange As Range
+    Dim luColNum As Long
+    Dim cell As Range
+    Dim cleanNumber As String
+
+    ' ===================== 1. SETTINGS =====================
+    keepCol1 = "LU ID"
+    keepCol2 = "Miejsce"
+    keepCol3 = "Zakres"
+    importantColName = "Miejsce"
+
+    Const FONT_NAME As String = "Calibri"
+    Const DATA_FONT_SIZE As Integer = 13
+    Const HEADER_FONT_SIZE As Integer = 14
+    Const BARCODE_FONT_NAME As String = "Free 3 of 9"
+    Const BARCODE_FONT_SIZE As Integer = 36          ' Large barcode for instant scanning
+    Const ROW_HEIGHT As Single = 52                 ' Safe gap between rows
+    ' =======================================================
+
+    Application.ScreenUpdating = False
+    Set ws = ActiveSheet
+
+    ' 2. Delete unwanted columns
+    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+    For i = lastCol To 1 Step -1
+        If ws.Cells(1, i).Value <> keepCol1 And _
+           ws.Cells(1, i).Value <> keepCol2 And _
+           ws.Cells(1, i).Value <> keepCol3 Then
+            ws.Columns(i).Delete
+        End If
+    Next i
+
+    ' 3. Locate LU ID column
+    Set luColRange = ws.Rows(1).Find(What:=keepCol1, LookIn:=xlValues, LookAt:=xlWhole)
+    If luColRange Is Nothing Then
+        MsgBox "LU ID column not found!", vbCritical
+        Exit Sub
+    End If
+    luColNum = luColRange.Column
+
+    ' 4. Clean numbers
+    lastRow = ws.Cells(ws.Rows.Count, luColNum).End(xlUp).Row
+    For Each cell In ws.Range(ws.Cells(2, luColNum), ws.Cells(lastRow, luColNum))
+        If cell.Value <> "" Then
+            cleanNumber = Format(cell.Value, "0")
+            cleanNumber = Replace(cleanNumber, "-", "")
+            cleanNumber = Replace(cleanNumber, ",", "")
+            cleanNumber = Replace(cleanNumber, ".", "")
+            cell.NumberFormat = "@"
+            cell.Value = cleanNumber
+        End If
+    Next cell
+
+    ' 5. Sort table
+    Set sortKeyRange = ws.Rows(1).Find(What:=importantColName, LookIn:=xlValues, LookAt:=xlWhole)
+    If Not sortKeyRange Is Nothing Then
+        ws.UsedRange.Sort Key1:=sortKeyRange, Order1:=xlAscending, Header:=xlYes
+    End If
+
+    ' 6. Add dedicated Barcode Column
+    ws.Columns(luColNum).Insert Shift:=xlToRight
+    ws.Cells(1, luColNum).Value = "Barcode"
+    
+    lastRow = ws.Cells(ws.Rows.Count, luColNum + 1).End(xlUp).Row
+    For i = 2 To lastRow
+        cleanNumber = ws.Cells(i, luColNum + 1).Value
+        If cleanNumber <> "" Then
+            With ws.Cells(i, luColNum)
+                .NumberFormat = "@"
+                .Value = "*" & cleanNumber & "*"
+                .Font.Name = BARCODE_FONT_NAME
+                .Font.Size = BARCODE_FONT_SIZE
+                .HorizontalAlignment = xlCenter
+                .VerticalAlignment = xlCenter
+            End With
+        End If
+    Next i
+
+    ' 7. Visual Hierarchy & Full-Width Geometry (Total width ~80-84 fits A4 Portrait perfectly)
+    ws.Columns(1).ColumnWidth = 28 ' Barcode: Wide area for barcode symbols
+    ws.Columns(2).ColumnWidth = 18 ' LU ID: Clear readable number
+    ws.Columns(3).ColumnWidth = 24 ' Destination: Main focus target
+    ws.Columns(4).ColumnWidth = 14 ' Article: Standard reference
+
+    ' Row height and alignment
+    With ws.Range(ws.Rows(2), ws.Rows(lastRow))
+        .RowHeight = ROW_HEIGHT
+        .VerticalAlignment = xlCenter
+    End With
+
+    ' Zebra striping
+    For i = 2 To lastRow
+        If i Mod 2 = 0 Then
+            ws.Range(ws.Cells(i, 1), ws.Cells(i, 4)).Interior.Color = RGB(245, 245, 245)
+        End If
+    Next i
+
+    ' Header styling
+    With ws.Rows(1)
+        .Font.Name = FONT_NAME
+        .Font.Bold = True
+        .Font.Size = HEADER_FONT_SIZE
+        .HorizontalAlignment = xlCenter
+        .RowHeight = 30
+        .Interior.Color = RGB(215, 215, 215)
+    End With
+
+    ' Thick borders
+    With ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, 4)).Borders(xlInsideHorizontal)
+        .LineStyle = xlContinuous
+        .Weight = xlMedium
+        .Color = RGB(130, 130, 130)
+    End With
+    With ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, 4)).Borders(xlInsideVertical)
+        .LineStyle = xlContinuous
+        .Weight = xlThin
+        .Color = RGB(190, 190, 190)
+    End With
+
+    ' LU ID numbers
+    With ws.Range(ws.Cells(2, 2), ws.Cells(lastRow, 2))
+        .Font.Name = FONT_NAME
+        .Font.Bold = True
+        .Font.Size = 14
+        .HorizontalAlignment = xlCenter
+    End With
+
+    ' Article styling
+    With ws.Range(ws.Cells(2, 4), ws.Cells(lastRow, 4))
+        .Font.Name = FONT_NAME
+        .Font.Size = DATA_FONT_SIZE
+        .HorizontalAlignment = xlCenter
+    End With
+
+    ' Highlight Destination: Biggest text, high contrast
+    Set sortKeyRange = ws.Rows(1).Find(What:=importantColName, LookIn:=xlValues, LookAt:=xlWhole)
+    If Not sortKeyRange Is Nothing Then
+        With ws.Range(ws.Cells(2, sortKeyRange.Column), ws.Cells(lastRow, sortKeyRange.Column))
+            .Font.Name = FONT_NAME
+            .Font.Bold = True
+            .Font.Size = 16 ' Significantly larger for instant visual orientation
+            .HorizontalAlignment = xlCenter
+        End With
+    End If
+
+    ' 8. Page setup (Full-width A4 Portrait)
+    With ws.PageSetup
+        .Orientation = xlPortrait
+        .PrintTitleRows = "$1:$1"
+        .CenterHorizontally = True     ' Perfectly centers the content on sheet
+        .Zoom = False
+        .FitToPagesWide = 1            ' Stretches exactly to 1 page width
+        .FitToPagesTall = False        ' Natural vertical page breaks
+        
+        .TopMargin = Application.InchesToPoints(0.4)
+        .BottomMargin = Application.InchesToPoints(0.4)
+        .LeftMargin = Application.InchesToPoints(0.3)
+        .RightMargin = Application.InchesToPoints(0.3)
+    End With
+
+    Application.ScreenUpdating = True
+    ws.PrintPreview
+End Sub
+

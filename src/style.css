@@ -1,0 +1,25 @@
+
+:root { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #202b29; background: #f5f6f2; font-synthesis: none; }
+* { box-sizing: border-box; } body { margin: 0; } a { color: inherit; text-decoration: none; }
+header, main, footer { width: min(1120px, calc(100% - 48px)); margin: auto; }
+header { height: 100px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #dce1d8; }
+.brand { display: flex; align-items: center; gap: 12px; font-size: 24px; font-weight: 750; color: #317659; }
+.brand span { color: #202b29; font-size: 21px; letter-spacing: -.7px; }
+.badge { font-size: 12px; border: 1px solid #dce1d8; border-radius: 30px; padding: 8px 13px; color: #64706a; }
+.intro { padding: 65px 0 35px; }.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #317659; }
+h1 { font-size: clamp(36px, 5vw, 58px); line-height: 1.12; letter-spacing: -2px; margin: 22px 0; font-weight: 650; } h1 span { color: #737f76; }
+.intro > p:last-child { color: #68746d; font-size: 15px; line-height: 1.7; }
+.files { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 30px; }
+.file { display: flex; gap: 18px; align-items: flex-start; padding: 26px; background: #fff; border: 1px solid #dce1d8; border-radius: 12px; }
+.file:hover, .file[aria-current] { border-color: #317659; background: #f0f7ef; }
+.icon { padding: 12px 10px; border-radius: 8px; background: #e9efe7; color: #317659; font: 600 17px monospace; }
+.type { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: #657169; }
+h2 { margin: 8px 0; font-size: 18px; font-weight: 600; }.file p { font-size: 13px; color: #68746d; line-height: 1.6; margin-bottom: 0; }.arrow { margin-left: auto; color: #317659; }
+#viewer { border: 1px solid #dce1d8; border-radius: 12px; overflow: hidden; background: white; }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 24px; }.toolbar h2 { font-size: 16px; margin: 0 0 6px; }.toolbar p { font-size: 12px; color: #68746d; margin: 0; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }button, #download { font: inherit; font-size: 12px; font-weight: 600; padding: 11px 14px; border: 1px solid #dce1d8; border-radius: 6px; background: white; cursor: pointer; }#download { background: #317659; color: white; border-color: #317659; }button:hover { background: #f0f7ef; }:focus-visible { outline: 3px solid #74a785; outline-offset: 3px; }
+pre { margin: 0; padding: 26px; max-height: 620px; overflow: auto; background: #1d2925; color: #dce8df; font: 13px/1.8 ui-monospace, SFMono-Regular, Consolas, monospace; tab-size: 4; }
+.viewer-footer { padding: 14px 24px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; color: #68746d; font-size: 11px; }
+#empty { padding: 45px 24px; text-align: center; border: 1px dashed #ccd5c9; border-radius: 12px; font-size: 14px; color: #68746d; }
+footer { margin-top: 65px; padding: 24px 0; border-top: 1px solid #dce1d8; display: flex; justify-content: space-between; font-size: 12px; color: #68746d; }[hidden] { display: none !important; }
+@media (max-width: 700px) { header, main, footer { width: calc(100% - 32px); }header { height: 78px; }.intro { padding-top: 35px; }.files { grid-template-columns: 1fr; }.file { padding: 20px; }.toolbar { align-items: flex-start; flex-direction: column; padding: 18px; }pre { padding: 18px; }.badge { font-size: 10px; } }

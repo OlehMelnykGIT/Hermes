@@ -1,0 +1,318 @@
+Option Explicit
+
+Sub SortujMiejsca()
+
+    Dim src As Range, col As Range, lastCell As Range
+    Dim result As Worksheet, work As Worksheet
+    Dim book As Workbook
+
+    Dim data As Variant, sorted As Variant
+    Dim buffer() As Variant, output() As Variant
+
+    Dim address As String, level As String, heading As String
+    Dim aisle As Double, rackRow As Double, slot As Double
+    Dim c As Long, i As Long, j As Long, n As Long
+    Dim total As Long, rejected As Long, previousN As Long
+
+    Dim oldCalculation As XlCalculation
+    Dim oldScreen As Boolean, oldEvents As Boolean
+    Dim oldAlerts As Boolean, settingsSaved As Boolean
+    Dim message As String, messageStyle As VbMsgBoxStyle
+    Dim cleanupError As Long
+
+    On Error GoTo Failed
+
+    If TypeName(Selection) <> "Range" Then
+        MsgBox "Zaznacz kolumny z adresami.", vbExclamation
+        Exit Sub
+    End If
+
+    Set src = Selection
+
+    If src.Areas.Count <> 1 Then
+        MsgBox "Zaznacz jeden ciagly zakres, np. A:F.", vbExclamation
+        Exit Sub
+    End If
+
+    Set book = src.Worksheet.Parent
+
+    If book.ProtectStructure Then
+        MsgBox "Struktura skoroszytu jest chroniona.", vbExclamation
+        Exit Sub
+    End If
+
+    oldCalculation = Application.Calculation
+    oldScreen = Application.ScreenUpdating
+    oldEvents = Application.EnableEvents
+    oldAlerts = Application.DisplayAlerts
+    settingsSaved = True
+
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+
+    ' Arkusz wynikowy dla wszystkich zaznaczonych kolumn.
+    Set result = book.Worksheets.Add( _
+        After:=book.Worksheets(book.Worksheets.Count))
+
+    ' Arkusz tymczasowy do sortowania.
+    Set work = book.Worksheets.Add( _
+        After:=book.Worksheets(book.Worksheets.Count))
+
+    work.Range("A1:E1").Value2 = Array( _
+        "Miejsce", "Poziom", "Aleja", "Rzad", "Pozycja")
+
+    For c = 1 To src.Columns.Count
+
+        Set col = src.Columns(c)
+
+        Set lastCell = col.Find( _
+            What:="*", _
+            After:=col.Cells(1, 1), _
+            LookIn:=xlFormulas, _
+            LookAt:=xlPart, _
+            SearchOrder:=xlByRows, _
+            SearchDirection:=xlPrevious, _
+            MatchCase:=False, _
+            SearchFormat:=False)
+
+        heading = "Miejsce " & c
+        n = 0
+
+        If Not lastCell Is Nothing Then
+
+            Set col = src.Worksheet.Range(col.Cells(1, 1), lastCell)
+
+            ' Odczyt calej kolumny do pamieci.
+            If col.Rows.Count = 1 Then
+                ReDim data(1 To 1, 1 To 1)
+                data(1, 1) = col.Value2
+            Else
+                data = col.Value2
+            End If
+
+            ReDim buffer(1 To UBound(data, 1), 1 To 5)
+
+            For i = 1 To UBound(data, 1)
+
+                If IsError(data(i, 1)) Then
+                    rejected = rejected + 1
+                Else
+                    address = Trim$(CStr(data(i, 1)))
+
+                    If Len(address) > 0 Then
+
+                        If ParsePlace(address, aisle, rackRow, _
+                                      level, slot) Then
+
+                            n = n + 1
+                            buffer(n, 1) = address
+                            buffer(n, 2) = level
+                            buffer(n, 3) = aisle
+                            buffer(n, 4) = rackRow
+                            buffer(n, 5) = slot
+
+                        ElseIf i = 1 Then
+                            ' Pierwszy wpis inny niz adres:
+                            ' zachowujemy go jako naglowek.
+                            heading = address
+                        Else
+                            rejected = rejected + 1
+                        End If
+
+                    End If
+                End If
+
+            Next i
+
+            Erase data
+
+            If n > result.Rows.Count - 1 Then
+                Err.Raise vbObjectError + 1000, , _
+                          "Za duzo adresow w kolumnie " & c
+            End If
+
+            If n > 0 Then
+
+                ReDim output(1 To n, 1 To 5)
+
+                For i = 1 To n
+                    For j = 1 To 5
+                        output(i, j) = buffer(i, j)
+                    Next j
+                Next i
+
+                Erase buffer
+
+                If previousN > 0 Then
+                    work.Range("A2").Resize(previousN, 5).ClearContents
+                End If
+
+                work.Range("A2").Resize(n, 1).NumberFormat = "@"
+                work.Range("A2").Resize(n, 5).Value2 = output
+                Erase output
+
+                With work.Sort
+                    .SortFields.Clear
+
+                    ' 1. Wysokosc: A, B, C...
+                    .SortFields.Add _
+                        Key:=work.Range("B2").Resize(n, 1), _
+                        SortOn:=xlSortOnValues, _
+                        Order:=xlAscending
+
+                    ' 2. Aleja.
+                    .SortFields.Add _
+                        Key:=work.Range("C2").Resize(n, 1), _
+                        SortOn:=xlSortOnValues, _
+                        Order:=xlAscending
+
+                    ' 3. Rzad: 01, 02, 03...
+                    .SortFields.Add _
+                        Key:=work.Range("D2").Resize(n, 1), _
+                        SortOn:=xlSortOnValues, _
+                        Order:=xlAscending
+
+                    ' 4. Miejsce: 1, 2, 3, 4...
+                    .SortFields.Add _
+                        Key:=work.Range("E2").Resize(n, 1), _
+                        SortOn:=xlSortOnValues, _
+                        Order:=xlAscending
+
+                    .SetRange work.Range("A1").Resize(n + 1, 5)
+                    .Header = xlYes
+                    .MatchCase = False
+                    .Orientation = xlTopToBottom
+                    .Apply
+                End With
+
+                ' Zapis posortowanych adresow do wyniku.
+                sorted = work.Range("A2").Resize(n, 1).Value2
+
+                With result.Cells(2, c).Resize(n, 1)
+                    .NumberFormat = "@"
+                    .Value2 = sorted
+                End With
+
+                Erase sorted
+                previousN = n
+                total = total + n
+
+            Else
+                Erase buffer
+            End If
+
+        End If
+
+        result.Cells(1, c).Value2 = heading
+
+    Next c
+
+    With result.Cells(1, 1).Resize(1, src.Columns.Count)
+        .Font.Bold = True
+        .EntireColumn.ColumnWidth = 24
+    End With
+
+    message = "Gotowe." & vbCrLf & _
+              "Kolumny: " & src.Columns.Count & vbCrLf & _
+              "Posortowane adresy: " & total & vbCrLf & _
+              "Pominiete bledne wpisy: " & rejected
+
+    messageStyle = vbInformation
+
+Finished:
+    On Error Resume Next
+
+    ' Usuwamy tylko arkusz tymczasowy tego uruchomienia.
+    If Not work Is Nothing Then
+        Application.DisplayAlerts = False
+        Err.Clear
+        work.Delete
+        cleanupError = Err.Number
+    End If
+
+    If settingsSaved Then
+        Application.Calculation = oldCalculation
+        Application.EnableEvents = oldEvents
+        Application.ScreenUpdating = oldScreen
+        Application.DisplayAlerts = oldAlerts
+    End If
+
+    On Error GoTo 0
+
+    If cleanupError <> 0 Then
+        message = message & vbCrLf & _
+                  "Nie udalo sie usunac arkusza tymczasowego."
+    End If
+
+    If Len(message) > 0 Then MsgBox message, messageStyle
+    Exit Sub
+
+Failed:
+    message = "Blad " & Err.Number & ": " & Err.Description
+
+    If Not result Is Nothing Then
+        message = message & vbCrLf & _
+                  "Wynik moze byc niekompletny."
+    End If
+
+    messageStyle = vbExclamation
+    Resume Finished
+
+End Sub
+
+Private Function ParsePlace( _
+    ByVal address As String, _
+    ByRef aisle As Double, _
+    ByRef rackRow As Double, _
+    ByRef level As String, _
+    ByRef slot As Double) As Boolean
+
+    Dim parts As Variant
+    Dim slotText As String
+
+    ' Obslugujemy podkreslenia oraz myslniki.
+    parts = Split(Replace(UCase$(address), "-", "_"), "_")
+
+    Select Case UBound(parts)
+
+        Case 3
+            ' Format: 22_01_A_1
+            level = parts(2)
+            slotText = parts(3)
+
+        Case 2
+            ' Format: 22_01_A1
+            level = Left$(parts(2), 1)
+            slotText = Mid$(parts(2), 2)
+
+        Case Else
+            Exit Function
+
+    End Select
+
+    If Len(level) <> 1 Then Exit Function
+
+    If InStr(1, "ABCDEFGH", level, vbBinaryCompare) = 0 Then
+        Exit Function
+    End If
+
+    If Not IsPlaceNumber(parts(0)) Then Exit Function
+    If Not IsPlaceNumber(parts(1)) Then Exit Function
+    If Not IsPlaceNumber(slotText) Then Exit Function
+
+    aisle = CDbl(parts(0))
+    rackRow = CDbl(parts(1))
+    slot = CDbl(slotText)
+
+    ParsePlace = True
+
+End Function
+
+Private Function IsPlaceNumber(ByVal value As String) As Boolean
+
+    If Len(value) = 0 Or Len(value) > 15 Then Exit Function
+
+    IsPlaceNumber = Not (value Like "*[!0-9]*")
+
+End Function
