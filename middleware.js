@@ -1,6 +1,7 @@
 // Vercel Routing Middleware: закриває паролем увесь сайт, включно з /api/*.
 // Без дійсної сесії сторінки перенаправляються на /login, а API повертає 401.
 
+import { next } from "@vercel/functions/middleware";
 import pl from "./src/i18n/pl.json";
 import uk from "./src/i18n/uk.json";
 import {
@@ -13,7 +14,8 @@ import {
   sessionCookie,
 } from "./server/session.js";
 
-export const config = { matcher: "/:path*" };
+// Node.js-середовище: повний process.env і Web Crypto без обмежень Edge.
+export const config = { runtime: "nodejs", matcher: "/:path*" };
 
 const dictionaries = { pl, uk };
 const FAILED_LOGIN_DELAY_MS = 800;
@@ -131,7 +133,22 @@ async function handleLogin(request, env) {
   return loginPage({ lang, next, error: "login.error", status: 401 });
 }
 
+// Помилка middleware не повинна перетворюватися на «500 MIDDLEWARE_INVOCATION_FAILED» без пояснень.
+// Показуємо лише тип і текст помилки (без змінних середовища), повний стек — у Vercel → Logs.
 export default async function middleware(request) {
+  try {
+    return await handle(request);
+  } catch (error) {
+    console.error("[hermes middleware]", error);
+    const detail = `${error?.name || "Error"}: ${String(error?.message || error).slice(0, 300)}`;
+    return new Response(`Hermes middleware error\n\n${detail}\n`, {
+      status: 500,
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+    });
+  }
+}
+
+async function handle(request) {
   const env = process.env;
   const url = new URL(request.url);
 
@@ -154,7 +171,7 @@ export default async function middleware(request) {
     return redirect(url, "/login", { "Set-Cookie": sessionCookie(request, "", 0) });
   }
 
-  if (await isAuthenticated(request, env)) return; // пропускаємо далі
+  if (await isAuthenticated(request, env)) return next(); // пропускаємо далі
 
   if (url.pathname.startsWith("/api/")) {
     return Response.json({ error: "unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
