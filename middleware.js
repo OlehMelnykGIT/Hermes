@@ -54,10 +54,12 @@ function safeNext(value) {
   return value;
 }
 
-function redirect(url, location, headers = {}) {
+// Відносний Location (лише шлях): браузер лишається на тому самому домені й https,
+// незалежно від того, яку внутрішню адресу бачить сервер. location завжди починається з «/».
+function redirect(_url, location, headers = {}) {
   return new Response(null, {
     status: 303,
-    headers: { Location: new URL(location, url).toString(), "Cache-Control": "no-store", ...headers },
+    headers: { Location: location, "Cache-Control": "no-store", ...headers },
   });
 }
 

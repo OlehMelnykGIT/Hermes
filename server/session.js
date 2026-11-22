@@ -90,7 +90,21 @@ export function isAuthenticated(request, env = process.env) {
 }
 
 // Захист від підробки запитів з чужих сайтів для POST.
+// Порівнюємо домен з Origin браузера з доменом, на який прийшов запит. На Vercel request.url
+// всередині може мати іншу схему (http://), тому беремо заголовки проксі і не дивимося на схему.
 export function sameOrigin(request) {
   const origin = request.headers.get("origin");
-  return !origin || origin === new URL(request.url).origin;
+  if (!origin) return true;
+  let originHost;
+  try {
+    originHost = new URL(origin).host.toLowerCase();
+  } catch {
+    return false;
+  }
+  const hosts = [
+    request.headers.get("x-forwarded-host"),
+    request.headers.get("host"),
+    new URL(request.url).host,
+  ];
+  return hosts.some((host) => host && host.split(",")[0].trim().toLowerCase() === originHost);
 }
