@@ -2,8 +2,8 @@
 // Без дійсної сесії сторінки перенаправляються на /login, а API повертає 401.
 
 import { next } from "@vercel/functions/middleware";
-import pl from "./src/i18n/pl.json";
-import uk from "./src/i18n/uk.json";
+import pl from "./src/i18n/pl.json" with { type: "json" };
+import uk from "./src/i18n/uk.json" with { type: "json" };
 import {
   authConfigured,
   createSession,
