@@ -1,62 +1,79 @@
 import "./style.css";
-import stol from "../StolPaletB3.txt?raw";
-import replen from "../ReplenPrint.txt?raw";
-import stolUrl from "../StolPaletB3.txt?url";
-import replenUrl from "../ReplenPrint.txt?url";
+import { LANGUAGES, escapeHtml, getLang, setLang, t } from "./i18n/index.js";
+import { files, mountScripts } from "./scripts/view.js";
+import { configReady } from "./config.js";
+import { mountTeam } from "./team/view.js";
+import { mountTrucks } from "./trucks/view.js";
 
-const files = [
-  {
-    name: "StolPaletB3.txt",
-    description: "Сортування адрес місць у таблиці Excel.",
-    content: stol,
-    url: stolUrl,
-  },
-  {
-    name: "ReplenPrint.txt",
-    description: "Підготовка звіту зі штрихкодами до друку.",
-    content: replen,
-    url: replenUrl,
-  },
-];
-document.querySelector("#app").innerHTML = `
-  <header><a class="brand" href="#">H<span>Hermes</span></a><span class="badge">Бібліотека макросів</span></header>
-  <main><section class="intro"><p class="eyebrow">РОБОЧІ ІНСТРУМЕНТИ</p><h1>Усе потрібне.<br><span>В одному місці.</span></h1><p>Виберіть файл, щоб переглянути код, скопіювати його або завантажити.</p></section>
-  <nav class="files" aria-label="Вибір файлу">${files.map((file) => `<a class="file" href="#${file.name}"><span class="icon" aria-hidden="true">&lt;/&gt;</span><div><span class="type">EXCEL · VBA</span><h2>${file.name}</h2><p>${file.description}</p></div><span class="arrow" aria-hidden="true">↗</span></a>`).join("")}</nav>
-  <section id="viewer" aria-labelledby="filename" hidden><div class="toolbar"><div><h2 id="filename"></h2><p id="info"></p></div><div class="actions"><button id="copy" type="button">Копіювати код</button><a id="download">Завантажити ↓</a></div></div><pre tabindex="0" aria-label="Вміст вибраного файлу"><code id="code"></code></pre><div class="viewer-footer"><span>Перегляд коду · Для запуску потрібен Excel</span><span id="status" role="status" aria-live="polite"></span></div></section>
-  <div id="empty">Виберіть один із двох файлів вище, щоб відкрити його вміст.</div></main>
-  <footer>Hermes<span>2 файли · Excel VBA</span></footer>`;
-let selected;
-function selectFile() {
-  selected = files.find((file) => `#${file.name}` === location.hash);
-  document.querySelector("#viewer").hidden = !selected;
-  document.querySelector("#empty").hidden = Boolean(selected);
-  document.querySelectorAll(".file").forEach((link, index) => {
-    if (files[index] === selected) link.setAttribute("aria-current", "true");
-    else link.removeAttribute("aria-current");
-  });
-  document.querySelector("#status").textContent = "";
-  if (!selected) return;
-  document.querySelector("#filename").textContent = selected.name;
-  document.querySelector("#info").textContent =
-    `${selected.content.trimEnd().split("\n").length} рядків · Текстовий файл`;
-  document.querySelector("#code").textContent = selected.content;
-  const download = document.querySelector("#download");
-  download.href = selected.url;
-  download.download = selected.name;
-  document.querySelector("pre").scrollTo(0, 0);
+// Маршрути: #/trucks, #/team, #/scripts, #/scripts/<файл>. Старі посилання #<файл> теж працюють.
+function parseRoute() {
+  const hash = decodeURIComponent(location.hash.slice(1));
+  if (hash.startsWith("/team")) return { page: "team" };
+  if (hash.startsWith("/scripts")) return { page: "scripts", file: hash.split("/")[2] || null };
+  if (files.some((file) => file.name === hash)) return { page: "scripts", file: hash };
+  return { page: "trucks" };
 }
-document.querySelector("#copy").addEventListener("click", async () => {
-  if (!selected) return;
-  const file = selected;
-  try {
-    await navigator.clipboard.writeText(file.content);
-    if (selected === file)
-      document.querySelector("#status").textContent = "Код скопійовано";
-  } catch {
-    if (selected === file)
-      document.querySelector("#status").textContent =
-        "Не вдалося скопіювати. Виділіть код і скопіюйте вручну.";
+
+let config = null; // відповідь /api/config
+let unmount = () => {};
+
+function renderShell() {
+  const route = parseRoute();
+  document.documentElement.lang = getLang();
+  document.title = t("app.title");
+  const navLink = (page, key) =>
+    `<a href="#/${page}"${route.page === page ? ' aria-current="page"' : ""}>${escapeHtml(t(key))}</a>`;
+  const langButton = ({ code, label }) =>
+    `<button type="button" data-lang="${code}" aria-pressed="${code === getLang()}">${label}</button>`;
+
+  document.querySelector("#app").innerHTML = `
+    <header>
+      <a class="brand" href="#/trucks">H<span>Hermes</span></a>
+      <nav class="main-nav" aria-label="${escapeHtml(t("nav.label"))}">${navLink("trucks", "nav.trucks")}${navLink("team", "nav.team")}${navLink("scripts", "nav.scripts")}</nav>
+      <div class="header-actions">
+        <div class="lang-switch" role="group" aria-label="${escapeHtml(t("header.language"))}">${LANGUAGES.map(langButton).join("")}</div>
+        <a id="sheet-link" class="header-button" target="_blank" rel="noopener noreferrer" hidden>${escapeHtml(t("header.sheet"))} ↗</a>
+        <form id="logout" method="post" action="/logout" hidden><button class="header-button" type="submit">${escapeHtml(t("header.logout"))}</button></form>
+      </div>
+    </header>
+    <main id="view"></main>
+    <footer>Hermes<span>Excel VBA · Google Sheets</span></footer>`;
+
+  document.querySelectorAll("[data-lang]").forEach((button) =>
+    button.addEventListener("click", () => {
+      setLang(button.dataset.lang);
+      renderShell();
+    }),
+  );
+  unmount();
+  const view = document.querySelector("#view");
+  const mounts = { scripts: () => mountScripts(view, route.file), team: () => mountTeam(view), trucks: () => mountTrucks(view) };
+  unmount = mounts[route.page]();
+  applyConfig();
+}
+
+// Посилання і кнопка виходу з'являються, коли сервер віддав налаштування (лише після входу).
+function applyConfig() {
+  if (!config) return;
+  document.querySelector("#logout").hidden = false;
+  const link = document.querySelector("#sheet-link");
+  if (config.sheetUrl) {
+    link.href = config.sheetUrl;
+    link.hidden = false;
   }
+}
+
+let lastPage = null;
+window.addEventListener("hashchange", () => {
+  const route = parseRoute();
+  // Перемикання файлів у межах макросів не перезавантажує сторінку фур.
+  if (route.page !== lastPage || route.page === "scripts") renderShell();
+  lastPage = route.page;
 });
-window.addEventListener("hashchange", selectFile);
-selectFile();
+
+lastPage = parseRoute().page;
+renderShell();
+configReady.then((value) => {
+  config = value;
+  applyConfig();
+});

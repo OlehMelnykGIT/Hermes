@@ -1,172 +1,428 @@
-Sub FinalizeSafeBarcodeReportPortraitFullWidth()
-    Dim ws As Worksheet
-    Dim lastCol As Long, lastRow As Long
-    Dim i As Long
-    Dim keepCol1 As String, keepCol2 As String, keepCol3 As String
-    Dim importantColName As String
-    Dim sortKeyRange As Range
-    Dim importantColNum As Long
-    Dim luColRange As Range
-    Dim luColNum As Long
-    Dim cell As Range
-    Dim cleanNumber As String
+Option Explicit
 
-    ' ===================== 1. SETTINGS =====================
-    keepCol1 = "LU ID"
-    keepCol2 = "Miejsce"
-    keepCol3 = "Zakres"
-    importantColName = "Miejsce"
+' =====================================================================
+'  DRUK REPLEN - raport z kodami kreskowymi (Code 39) do druku
+'  Logika jak w Google Apps Script (ReplenPalet.gs):
+'   - dane wejsciowe: arkusz Dane_Replen (lub aktywny arkusz),
+'   - wynik: osobny arkusz Druk_Replen, dane wejsciowe NIE sa zmieniane,
+'   - kolumny szukane po nazwie i numerze wystapienia,
+'   - kontrola skroconych LU ID (2,502E+11) i znakow Code 39,
+'   - sortowanie: Miejsce (naturalnie: 2 < 10), potem Czas zmiany.
+'  Wymagana czcionka: Libre Barcode 39 Text (link na stronie Hermes).
+' =====================================================================
 
-    Const FONT_NAME As String = "Calibri"
-    Const DATA_FONT_SIZE As Integer = 13
-    Const HEADER_FONT_SIZE As Integer = 14
-    Const BARCODE_FONT_NAME As String = "Free 3 of 9"
-    Const BARCODE_FONT_SIZE As Integer = 36          ' Large barcode for instant scanning
-    Const ROW_HEIGHT As Single = 52                 ' Safe gap between rows
-    ' =======================================================
+' ===================== USTAWIENIA =====================
+Private Const SHEET_IN As String = "Dane_Replen"     ' jesli brak - aktywny arkusz
+Private Const SHEET_OUT As String = "Druk_Replen"
 
-    Application.ScreenUpdating = False
-    Set ws = ActiveSheet
+' Nazwa kolumny + ktore wystapienie tej nazwy (1 = pierwsze, 2 = drugie)
+Private Const COL_LU As String = "LU ID"
+Private Const COL_LU_NR As Long = 1
+Private Const COL_ZAKRES As String = "Zakres"         ' np. B74PPT - dokad
+Private Const COL_ZAKRES_NR As Long = 1
+Private Const COL_MIEJSCE As String = "Miejsce"       ' np. 02_03_E_1 - skad wziac
+Private Const COL_MIEJSCE_NR As Long = 2
+Private Const COL_CZAS As String = "Czas zmiany"
+Private Const COL_CZAS_NR As Long = 1
 
-    ' 2. Delete unwanted columns
-    lastCol = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
-    For i = lastCol To 1 Step -1
-        If ws.Cells(1, i).Value <> keepCol1 And _
-           ws.Cells(1, i).Value <> keepCol2 And _
-           ws.Cells(1, i).Value <> keepCol3 Then
-            ws.Columns(i).Delete
-        End If
-    Next i
+Private Const SORT_BY_TIME_TOO As Boolean = True
+Private Const TIME_FORMAT As String = "hh:nn"
 
-    ' 3. Locate LU ID column
-    Set luColRange = ws.Rows(1).Find(What:=keepCol1, LookIn:=xlValues, LookAt:=xlWhole)
-    If luColRange Is Nothing Then
-        MsgBox "LU ID column not found!", vbCritical
+Private Const FONT_NAME As String = "Calibri"
+Private Const BARCODE_FONT As String = "Libre Barcode 39 Text"
+Private Const BARCODE_SIZE As Long = 36
+Private Const ROW_HEIGHT_PT As Single = 56            ' ok. 75 px
+Private Const HEADER_HEIGHT_PT As Single = 30         ' ok. 40 px
+Private Const SHOW_PRINT_PREVIEW As Boolean = True
+
+Private Const CODE39_CHARS As String = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-. $/+%"
+' ======================================================
+
+Sub DrukReplen()
+    Dim book As Workbook, src As Worksheet, ws As Worksheet
+    Dim data As Variant, lastCell As Range
+    Dim cLu As Long, cZakres As Long, cMiejsce As Long, cCzas As Long
+    Dim r As Long, n As Long, i As Long, broken As Long, badChars As Long
+    Dim lu As String, timeText As String, timeValue As Double
+    Dim keys() As String, idx() As Long, rowsOut() As Variant, outArr() As Variant
+    Dim oldScreen As Boolean, settingsSaved As Boolean
+
+    On Error GoTo Failed
+
+    Set book = ActiveWorkbook
+    If book Is Nothing Then Exit Sub
+
+    Set src = FindSheet(book, SHEET_IN)
+    If src Is Nothing Then Set src = ActiveSheet
+    If src.Name = SHEET_OUT Then
+        MsgBox "Otworz arkusz z danymi (" & SHEET_IN & "), a nie " & SHEET_OUT & ".", vbExclamation
         Exit Sub
     End If
-    luColNum = luColRange.Column
 
-    ' 4. Clean numbers
-    lastRow = ws.Cells(ws.Rows.Count, luColNum).End(xlUp).Row
-    For Each cell In ws.Range(ws.Cells(2, luColNum), ws.Cells(lastRow, luColNum))
-        If cell.Value <> "" Then
-            cleanNumber = Format(cell.Value, "0")
-            cleanNumber = Replace(cleanNumber, "-", "")
-            cleanNumber = Replace(cleanNumber, ",", "")
-            cleanNumber = Replace(cleanNumber, ".", "")
-            cell.NumberFormat = "@"
-            cell.Value = cleanNumber
+    Set lastCell = LastUsedCell(src)
+    If lastCell Is Nothing Then
+        MsgBox "Arkusz " & src.Name & " jest pusty. Wklej dane z systemu.", vbExclamation
+        Exit Sub
+    End If
+    If lastCell.Row < 2 Then
+        MsgBox "Brak danych pod naglowkami w arkuszu " & src.Name & ".", vbExclamation
+        Exit Sub
+    End If
+    data = src.Range(src.Cells(1, 1), lastCell).Value
+
+    ' --- 1. Kolumny po nazwie ---
+    cLu = FindCol(data, COL_LU, COL_LU_NR)
+    cZakres = FindCol(data, COL_ZAKRES, COL_ZAKRES_NR)
+    cMiejsce = FindCol(data, COL_MIEJSCE, COL_MIEJSCE_NR)
+    cCzas = FindCol(data, COL_CZAS, COL_CZAS_NR)
+    If cLu = 0 Then MissingColumn COL_LU, COL_LU_NR, src: Exit Sub
+    If cZakres = 0 Then MissingColumn COL_ZAKRES, COL_ZAKRES_NR, src: Exit Sub
+    If cMiejsce = 0 Then MissingColumn COL_MIEJSCE, COL_MIEJSCE_NR, src: Exit Sub
+    If cCzas = 0 Then MissingColumn COL_CZAS, COL_CZAS_NR, src: Exit Sub
+
+    ' --- 2. Wiersze + kontrola LU ID ---
+    ReDim keys(1 To UBound(data, 1))
+    ReDim idx(1 To UBound(data, 1))
+    ReDim rowsOut(1 To UBound(data, 1))
+
+    For r = 2 To UBound(data, 1)
+        If CellText(data(r, cLu)) <> "" Then
+            If IsShortenedLu(data(r, cLu)) Then broken = broken + 1
+
+            lu = CleanLu(data(r, cLu))
+            If Not IsCode39(lu) Then badChars = badChars + 1
+
+            ParseTime data(r, cCzas), timeText, timeValue
+
+            n = n + 1
+            rowsOut(n) = Array("*" & lu & "*", CellText(data(r, cZakres)), CellText(data(r, cMiejsce)), timeText)
+            keys(n) = NaturalKey(CellText(data(r, cMiejsce)))
+            If SORT_BY_TIME_TOO Then keys(n) = keys(n) & "|" & Format(timeValue, "000000.000000")
+            keys(n) = keys(n) & "|" & Format(r, "0000000")   ' stabilna kolejnosc
+            idx(n) = n
         End If
-    Next cell
+    Next r
 
-    ' 5. Sort table
-    Set sortKeyRange = ws.Rows(1).Find(What:=importantColName, LookIn:=xlValues, LookAt:=xlWhole)
-    If Not sortKeyRange Is Nothing Then
-        ws.UsedRange.Sort Key1:=sortKeyRange, Order1:=xlAscending, Header:=xlYes
+    If n = 0 Then
+        MsgBox "Brak LU ID w kolumnie """ & COL_LU & """.", vbExclamation
+        Exit Sub
+    End If
+    If broken > 0 Then
+        MsgBox "Skrocone numery LU ID (np. 2,502E+11): " & broken & "." & vbLf & vbLf & _
+               "W Excelu ustaw format ""Liczbowe, 0 miejsc po przecinku"" i skopiuj dane ponownie.", _
+               vbCritical, "Blad LU ID"
+        Exit Sub
+    End If
+    If badChars > 0 Then
+        MsgBox "LU ID z niedozwolonymi znakami dla Code 39: " & badChars & "." & vbLf & _
+               "Dozwolone: cyfry, A-Z oraz - . $ / + % i spacja.", vbCritical, "Blad LU ID"
+        Exit Sub
     End If
 
-    ' 6. Add dedicated Barcode Column
-    ws.Columns(luColNum).Insert Shift:=xlToRight
-    ws.Cells(1, luColNum).Value = "Barcode"
-    
-    lastRow = ws.Cells(ws.Rows.Count, luColNum + 1).End(xlUp).Row
-    For i = 2 To lastRow
-        cleanNumber = ws.Cells(i, luColNum + 1).Value
-        If cleanNumber <> "" Then
-            With ws.Cells(i, luColNum)
-                .NumberFormat = "@"
-                .Value = "*" & cleanNumber & "*"
-                .Font.Name = BARCODE_FONT_NAME
-                .Font.Size = BARCODE_FONT_SIZE
-                .HorizontalAlignment = xlCenter
-                .VerticalAlignment = xlCenter
-            End With
-        End If
+    ' --- 3. Sortowanie: Miejsce, potem czas ---
+    QuickSort keys, idx, 1, n
+
+    ReDim outArr(1 To n + 1, 1 To 4)
+    outArr(1, 1) = "Barcode": outArr(1, 2) = "Zakres": outArr(1, 3) = "Miejsce": outArr(1, 4) = "Czas zmiany"
+    For i = 1 To n
+        outArr(i + 1, 1) = rowsOut(idx(i))(0)
+        outArr(i + 1, 2) = rowsOut(idx(i))(1)
+        outArr(i + 1, 3) = rowsOut(idx(i))(2)
+        outArr(i + 1, 4) = rowsOut(idx(i))(3)
     Next i
 
-    ' 7. Visual Hierarchy & Full-Width Geometry (Total width ~80-84 fits A4 Portrait perfectly)
-    ws.Columns(1).ColumnWidth = 28 ' Barcode: Wide area for barcode symbols
-    ws.Columns(2).ColumnWidth = 18 ' LU ID: Clear readable number
-    ws.Columns(3).ColumnWidth = 24 ' Destination: Main focus target
-    ws.Columns(4).ColumnWidth = 14 ' Article: Standard reference
+    ' --- 4. Zapis do Druk_Replen ---
+    oldScreen = Application.ScreenUpdating
+    settingsSaved = True
+    Application.ScreenUpdating = False
 
-    ' Row height and alignment
-    With ws.Range(ws.Rows(2), ws.Rows(lastRow))
-        .RowHeight = ROW_HEIGHT
-        .VerticalAlignment = xlCenter
+    Set ws = FindSheet(book, SHEET_OUT)
+    If ws Is Nothing Then
+        If book.ProtectStructure Then
+            Application.ScreenUpdating = oldScreen
+            MsgBox "Struktura skoroszytu jest chroniona - nie mozna dodac arkusza " & SHEET_OUT & ".", vbExclamation
+            Exit Sub
+        End If
+        Set ws = book.Worksheets.Add(After:=book.Sheets(book.Sheets.Count))
+        ws.Name = SHEET_OUT
+    End If
+
+    ws.Cells.Clear
+    With ws.Range("A1").Resize(n + 1, 4)
+        .NumberFormat = "@"
+        .Value = outArr
     End With
 
-    ' Zebra striping
-    For i = 2 To lastRow
-        If i Mod 2 = 0 Then
-            ws.Range(ws.Cells(i, 1), ws.Cells(i, 4)).Interior.Color = RGB(245, 245, 245)
-        End If
+    FormatReport ws, n + 1
+
+    ws.Activate
+    With ActiveWindow
+        .FreezePanes = False
+        .SplitColumn = 0
+        .SplitRow = 1
+        .FreezePanes = True
+    End With
+    ws.Range("A1").Select
+
+    Application.ScreenUpdating = oldScreen
+    MsgBox "Gotowe! Liczba palet: " & n & "." & vbLf & _
+           "Arkusz " & SHEET_OUT & " - Ctrl+P, aby wydrukowac." & vbLf & vbLf & _
+           "Jesli zamiast kodow widzisz zwykly tekst, zainstaluj czcionke " & BARCODE_FONT & _
+           " (link na stronie Hermes).", vbInformation, "Raport"
+    If SHOW_PRINT_PREVIEW Then ws.PrintPreview
+    Exit Sub
+
+Failed:
+    If settingsSaved Then Application.ScreenUpdating = oldScreen
+    MsgBox "Blad " & Err.Number & ": " & Err.Description, vbCritical
+End Sub
+
+' Czysci arkusz Dane_Replen przed wklejeniem nowych danych.
+Sub WyczyscDaneReplen()
+    Dim ws As Worksheet
+    Set ws = FindSheet(ActiveWorkbook, SHEET_IN)
+    If ws Is Nothing Then
+        MsgBox "Brak arkusza " & SHEET_IN & ".", vbExclamation
+        Exit Sub
+    End If
+    If MsgBox("Wyczyscic arkusz " & SHEET_IN & "?", vbYesNo + vbQuestion) = vbYes Then
+        ws.Cells.Clear
+        MsgBox "Arkusz " & SHEET_IN & " wyczyszczony. Mozesz wkleic nowe dane.", vbInformation, "Gotowe"
+    End If
+End Sub
+
+' ===================== FORMATOWANIE =====================
+
+Private Sub FormatReport(ws As Worksheet, rowCount As Long)
+    Dim all As Range, i As Long
+
+    Set all = ws.Range("A1").Resize(rowCount, 4)
+
+    ws.Columns(1).ColumnWidth = 60    ' Barcode (ok. 430 px)
+    ws.Columns(2).ColumnWidth = 15    ' Zakres
+    ws.Columns(3).ColumnWidth = 22    ' Miejsce
+    ws.Columns(4).ColumnWidth = 13    ' Czas zmiany
+
+    ws.Rows(1).RowHeight = HEADER_HEIGHT_PT
+    If rowCount > 1 Then ws.Range(ws.Rows(2), ws.Rows(rowCount)).RowHeight = ROW_HEIGHT_PT
+
+    all.HorizontalAlignment = xlCenter
+    all.VerticalAlignment = xlCenter
+
+    ' Zebra
+    ws.Range("A1:D1").Interior.Color = RGB(215, 215, 215)
+    For i = 3 To rowCount Step 2
+        ws.Range(ws.Cells(i, 1), ws.Cells(i, 4)).Interior.Color = RGB(245, 245, 245)
     Next i
 
-    ' Header styling
-    With ws.Rows(1)
-        .Font.Name = FONT_NAME
-        .Font.Bold = True
-        .Font.Size = HEADER_FONT_SIZE
-        .HorizontalAlignment = xlCenter
-        .RowHeight = 30
-        .Interior.Color = RGB(215, 215, 215)
+    ' Czcionki
+    With ws.Range("A1:D1").Font
+        .Name = FONT_NAME
+        .Bold = True
+        .Size = 14
     End With
-
-    ' Thick borders
-    With ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, 4)).Borders(xlInsideHorizontal)
-        .LineStyle = xlContinuous
-        .Weight = xlMedium
-        .Color = RGB(130, 130, 130)
-    End With
-    With ws.Range(ws.Cells(1, 1), ws.Cells(lastRow, 4)).Borders(xlInsideVertical)
-        .LineStyle = xlContinuous
-        .Weight = xlThin
-        .Color = RGB(190, 190, 190)
-    End With
-
-    ' LU ID numbers
-    With ws.Range(ws.Cells(2, 2), ws.Cells(lastRow, 2))
-        .Font.Name = FONT_NAME
-        .Font.Bold = True
-        .Font.Size = 14
-        .HorizontalAlignment = xlCenter
-    End With
-
-    ' Article styling
-    With ws.Range(ws.Cells(2, 4), ws.Cells(lastRow, 4))
-        .Font.Name = FONT_NAME
-        .Font.Size = DATA_FONT_SIZE
-        .HorizontalAlignment = xlCenter
-    End With
-
-    ' Highlight Destination: Biggest text, high contrast
-    Set sortKeyRange = ws.Rows(1).Find(What:=importantColName, LookIn:=xlValues, LookAt:=xlWhole)
-    If Not sortKeyRange Is Nothing Then
-        With ws.Range(ws.Cells(2, sortKeyRange.Column), ws.Cells(lastRow, sortKeyRange.Column))
-            .Font.Name = FONT_NAME
-            .Font.Bold = True
-            .Font.Size = 16 ' Significantly larger for instant visual orientation
-            .HorizontalAlignment = xlCenter
+    If rowCount > 1 Then
+        With ws.Range(ws.Cells(2, 1), ws.Cells(rowCount, 1)).Font
+            .Name = BARCODE_FONT
+            .Size = BARCODE_SIZE
+            .Bold = False
+        End With
+        With ws.Range(ws.Cells(2, 2), ws.Cells(rowCount, 2)).Font
+            .Name = FONT_NAME
+            .Bold = False
+            .Size = 15
+        End With
+        With ws.Range(ws.Cells(2, 3), ws.Cells(rowCount, 3)).Font
+            .Name = FONT_NAME
+            .Bold = True
+            .Size = 17
+        End With
+        With ws.Range(ws.Cells(2, 4), ws.Cells(rowCount, 4)).Font
+            .Name = FONT_NAME
+            .Bold = False
+            .Size = 13
         End With
     End If
 
-    ' 8. Page setup (Full-width A4 Portrait)
+    ' Ramki: zewnetrzne i poziome - grube szare, pionowe - cienkie jasne
+    SetBorder all, xlEdgeTop, xlMedium, RGB(130, 130, 130)
+    SetBorder all, xlEdgeBottom, xlMedium, RGB(130, 130, 130)
+    SetBorder all, xlEdgeLeft, xlMedium, RGB(130, 130, 130)
+    SetBorder all, xlEdgeRight, xlMedium, RGB(130, 130, 130)
+    If rowCount > 1 Then SetBorder all, xlInsideHorizontal, xlMedium, RGB(130, 130, 130)
+    SetBorder all, xlInsideVertical, xlThin, RGB(190, 190, 190)
+
+    ' Strona: A4 pionowo, cala szerokosc
+    On Error Resume Next   ' PageSetup moze nie dzialac bez drukarki
     With ws.PageSetup
         .Orientation = xlPortrait
         .PrintTitleRows = "$1:$1"
-        .CenterHorizontally = True     ' Perfectly centers the content on sheet
+        .CenterHorizontally = True
         .Zoom = False
-        .FitToPagesWide = 1            ' Stretches exactly to 1 page width
-        .FitToPagesTall = False        ' Natural vertical page breaks
-        
+        .FitToPagesWide = 1
+        .FitToPagesTall = False
         .TopMargin = Application.InchesToPoints(0.4)
         .BottomMargin = Application.InchesToPoints(0.4)
         .LeftMargin = Application.InchesToPoints(0.3)
         .RightMargin = Application.InchesToPoints(0.3)
     End With
-
-    Application.ScreenUpdating = True
-    ws.PrintPreview
+    On Error GoTo 0
 End Sub
 
+Private Sub SetBorder(rng As Range, edge As XlBordersIndex, weight As XlBorderWeight, color As Long)
+    With rng.Borders(edge)
+        .LineStyle = xlContinuous
+        .Weight = weight
+        .Color = color
+    End With
+End Sub
+
+' ===================== POMOCNICZE =====================
+
+Private Function FindSheet(book As Workbook, sheetName As String) As Worksheet
+    Dim ws As Worksheet
+    For Each ws In book.Worksheets
+        If StrComp(ws.Name, sheetName, vbTextCompare) = 0 Then
+            Set FindSheet = ws
+            Exit Function
+        End If
+    Next ws
+End Function
+
+Private Function LastUsedCell(ws As Worksheet) As Range
+    Dim lastRowCell As Range, lastColCell As Range
+    Set lastRowCell = ws.Cells.Find(What:="*", LookIn:=xlFormulas, SearchOrder:=xlByRows, SearchDirection:=xlPrevious)
+    If lastRowCell Is Nothing Then Exit Function
+    Set lastColCell = ws.Cells.Find(What:="*", LookIn:=xlFormulas, SearchOrder:=xlByColumns, SearchDirection:=xlPrevious)
+    Set LastUsedCell = ws.Cells(lastRowCell.Row, lastColCell.Column)
+End Function
+
+' Numer kolumny (1..) z naglowkiem "name", wystapienie nr "occurrence"; 0 = brak.
+Private Function FindCol(data As Variant, colName As String, occurrence As Long) As Long
+    Dim c As Long, count As Long
+    For c = 1 To UBound(data, 2)
+        If StrComp(CellText(data(1, c)), colName, vbTextCompare) = 0 Then
+            count = count + 1
+            If count = occurrence Then
+                FindCol = c
+                Exit Function
+            End If
+        End If
+    Next c
+End Function
+
+Private Sub MissingColumn(colName As String, occurrence As Long, ws As Worksheet)
+    MsgBox "Nie znaleziono kolumny """ & colName & """ (nr " & occurrence & ")." & vbLf & _
+           "Sprawdz naglowki w arkuszu " & ws.Name & ".", vbCritical, "Blad"
+End Sub
+
+Private Function CellText(v As Variant) As String
+    If IsError(v) Or IsEmpty(v) Then Exit Function
+    CellText = Trim$(Replace(CStr(v), Chr$(160), " "))
+End Function
+
+' 2,502E+11 jako tekst albo liczba "obcieta" do milionow
+Private Function IsShortenedLu(v As Variant) As Boolean
+    If IsError(v) Then IsShortenedLu = True: Exit Function
+    If InStr(1, CStr(v), "E+", vbTextCompare) > 0 Then IsShortenedLu = True: Exit Function
+    If VarType(v) = vbDouble Then
+        If v >= 1000000# Then
+            If Fix(v / 1000000#) * 1000000# = v Then IsShortenedLu = True
+        End If
+    End If
+End Function
+
+Private Function CleanLu(v As Variant) As String
+    Dim s As String
+    If VarType(v) = vbDouble Or VarType(v) = vbCurrency Or VarType(v) = vbDecimal Then
+        s = Format(v, "0")
+    Else
+        s = CStr(v)
+    End If
+    s = Replace(s, "-", "")
+    s = Replace(s, ".", "")
+    s = Replace(s, ",", "")
+    s = Replace(s, " ", "")
+    s = Replace(s, Chr$(160), "")
+    CleanLu = UCase$(s)
+End Function
+
+Private Function IsCode39(s As String) As Boolean
+    Dim i As Long
+    If Len(s) = 0 Then Exit Function
+    For i = 1 To Len(s)
+        If InStr(1, CODE39_CHARS, Mid$(s, i, 1), vbBinaryCompare) = 0 Then Exit Function
+    Next i
+    IsCode39 = True
+End Function
+
+' Czas jako data Excela albo tekst "30.10.2026 18:41"
+Private Sub ParseTime(v As Variant, ByRef txt As String, ByRef value As Double)
+    Dim s As String, parts() As String, d() As String, t() As String
+    txt = "": value = 0
+    If IsError(v) Or IsEmpty(v) Then Exit Sub
+
+    If VarType(v) = vbDate Then
+        txt = Format(v, TIME_FORMAT)
+        value = CDbl(v)
+        Exit Sub
+    End If
+
+    s = Trim$(CStr(v))
+    txt = s
+    parts = Split(Application.WorksheetFunction.Trim(s), " ")
+    If UBound(parts) < 1 Then Exit Sub
+    d = Split(parts(0), ".")
+    t = Split(parts(1), ":")
+    If UBound(d) <> 2 Or UBound(t) < 1 Then Exit Sub
+    If Not (IsNumeric(d(0)) And IsNumeric(d(1)) And IsNumeric(d(2)) And IsNumeric(t(0)) And IsNumeric(t(1))) Then Exit Sub
+
+    On Error GoTo BadDate
+    value = CDbl(DateSerial(CInt(d(2)), CInt(d(1)), CInt(d(0))) + TimeSerial(CInt(t(0)), CInt(t(1)), 0))
+    txt = Format(value, TIME_FORMAT)
+    Exit Sub
+BadDate:
+    value = 0
+    txt = s
+End Sub
+
+' "2_5_A_3" -> "00000002_00000005_A_00000003": zwykle porownanie tekstu daje kolejnosc naturalna.
+Private Function NaturalKey(s As String) As String
+    Dim i As Long, ch As String, digits As String, result As String
+    For i = 1 To Len(s)
+        ch = Mid$(s, i, 1)
+        If ch Like "#" Then
+            digits = digits & ch
+        Else
+            If Len(digits) > 0 Then result = result & Right$(String$(8, "0") & digits, 8): digits = ""
+            result = result & UCase$(ch)
+        End If
+    Next i
+    If Len(digits) > 0 Then result = result & Right$(String$(8, "0") & digits, 8)
+    NaturalKey = result
+End Function
+
+Private Sub QuickSort(keys() As String, idx() As Long, ByVal lo As Long, ByVal hi As Long)
+    Dim i As Long, j As Long, pivot As String, tk As String, ti As Long
+    Do While lo < hi
+        i = lo: j = hi
+        pivot = keys((lo + hi) \ 2)
+        Do While i <= j
+            Do While StrComp(keys(i), pivot, vbBinaryCompare) < 0: i = i + 1: Loop
+            Do While StrComp(keys(j), pivot, vbBinaryCompare) > 0: j = j - 1: Loop
+            If i <= j Then
+                tk = keys(i): keys(i) = keys(j): keys(j) = tk
+                ti = idx(i): idx(i) = idx(j): idx(j) = ti
+                i = i + 1: j = j - 1
+            End If
+        Loop
+        ' rekurencja na mniejszej czesci, petla na wiekszej
+        If j - lo < hi - i Then
+            If lo < j Then QuickSort keys, idx, lo, j
+            lo = i
+        Else
+            If i < hi Then QuickSort keys, idx, i, hi
+            hi = j
+        End If
+    Loop
+End Sub
