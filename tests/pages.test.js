@@ -334,3 +334,18 @@ describe("NCG: групи за датою з колонки Data", () => {
     assert.deepEqual(groups.map((g) => g.current), [true, false, false]);
   });
 });
+
+describe("дні після очищення аркуша", () => {
+  test("закритий день без WAB і без статистики не показується", () => {
+    const days_ = [
+      { id: "2026-11-23T08:28:43", nr: 1, fromRow: 2, toRow: 5, open: false, closedAt: "2026-11-23T09:56:30" },
+      { id: "2026-11-23T10:15:29", nr: 1, fromRow: 2, toRow: 1, open: true, closedAt: null },
+    ];
+    const groups = days.groupByDays([], days_);
+    assert.equal(groups.closed.length, 1);
+    assert.equal(days.visibleClosedDays(groups, []).length, 0);
+    const stats = [{ dayId: "2026-11-23T08:28:43", day: "2026-11-23", druk: 5, lu: 2 }];
+    assert.equal(days.visibleClosedDays(groups, stats).length, 1); // статистика є — день лишається
+  });
+});
+

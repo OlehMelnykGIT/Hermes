@@ -31,6 +31,13 @@ export function groupByDays(items, days) {
   };
 }
 
+// Закриті дні, які варто показувати: є WAB або статистика.
+// Після очищення аркуша (новий тиждень) Api.gs ще може віддавати старі дні —
+// їхні рядки вже порожні, тож такі дні нічого не показують і ховаються.
+export function visibleClosedDays(groups, stats) {
+  return groups.closed.filter(({ day, items }) => items.length > 0 || statsForDay(stats, day) !== null);
+}
+
 // Статистика конкретного дня: запис, у якого dayId === day.id, або null.
 export function statsForDay(stats, day) {
   if (!Array.isArray(stats) || !day?.id) return null;

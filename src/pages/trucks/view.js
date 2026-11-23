@@ -39,6 +39,7 @@ import {
   groupByDays,
   recentStats,
   statsForDay,
+  visibleClosedDays,
 } from "./days.js";
 import { ncgSection } from "./ncgView.js";
 
@@ -218,7 +219,8 @@ function statsCards(stats, days) {
 
 // Закриті дні: згорнуті блоки з підсумком; розгорнуті запам'ятовуються (openDays).
 function closedDays(groups, stats, openDays, now) {
-  const blocks = groups.closed.map(({ day, items }) => {
+  const shown = visibleClosedDays(groups, stats);
+  const blocks = shown.map(({ day, items }) => {
     const summary = summarize(items, now);
     const dayStats = statsForDay(stats, day);
     return html`<details class="panel day" data-day="${day.nr}" ${openDays.has(String(day.nr)) ? html`open` : ""}>
@@ -241,7 +243,7 @@ function closedDays(groups, stats, openDays, now) {
   }
   if (blocks.length === 0) return "";
   // «Zakończone dni» — лише якщо закриті дні справді є; інакше тут тільки рядки поза днями.
-  const title = groups.closed.length > 0 ? t("trucks.day.closedTitle") : t("trucks.day.outsideTitle");
+  const title = shown.length > 0 ? t("trucks.day.closedTitle") : t("trucks.day.outsideTitle");
   return html`<div class="section-bar"><h2>${title}</h2></div><div class="days">${blocks}</div>`;
 }
 
