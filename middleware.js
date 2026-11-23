@@ -25,6 +25,33 @@ export const config = { runtime: "nodejs", matcher: "/:path*" };
 
 const FAILED_LOGIN_DELAY_MS = 800; // ускладнює перебір паролів
 
+// Ліміт невдалих спроб входу з однієї IP-адреси: після MAX_FAILURES за вікно — 429 до кінця вікна.
+// Лічильник у пам'яті функції: не ідеальний (кілька екземплярів, перезапуск), але разом
+// із затримкою робить перебір пароля дуже повільним.
+const MAX_FAILURES = 10;
+const FAILURE_WINDOW_MS = 15 * 60 * 1000;
+const failures = new Map(); // ip → { count, resetAt }
+
+function clientIp(request) {
+  return (request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown").split(",")[0].trim();
+}
+
+function isLockedOut(ip, now = Date.now()) {
+  const entry = failures.get(ip);
+  if (entry && entry.resetAt <= now) failures.delete(ip);
+  return (failures.get(ip)?.count ?? 0) >= MAX_FAILURES;
+}
+
+function recordFailure(ip, now = Date.now()) {
+  if (failures.size > 5000) failures.clear(); // захист пам'яті від тисяч адрес
+  const entry = failures.get(ip);
+  if (entry && entry.resetAt > now) entry.count++;
+  else failures.set(ip, { count: 1, resetAt: now + FAILURE_WINDOW_MS });
+}
+
+// Для тестів.
+export const resetLoginLimits = () => failures.clear();
+
 // ===================== Допоміжне =====================
 
 const validLang = (value) => (value === "pl" || value === "uk" ? value : null);
@@ -78,9 +105,15 @@ async function submitLogin(request, env) {
   if (!authConfigured(env)) {
     return loginResponse({ lang, nextPath, errorKey: "login.notConfigured", status: 500 });
   }
+  const ip = clientIp(request);
+  if (isLockedOut(ip)) {
+    return loginResponse({ lang, nextPath, errorKey: "login.tooMany", status: 429, headers: { "Retry-After": "900" } });
+  }
   if (await passwordMatches(env, form?.get("password"))) {
+    failures.delete(ip);
     return redirect(nextPath, { "Set-Cookie": sessionCookie(request, await createSession(env)) });
   }
+  recordFailure(ip);
   await new Promise((resolve) => setTimeout(resolve, FAILED_LOGIN_DELAY_MS));
   return loginResponse({ lang, nextPath, errorKey: "login.error", status: 401 });
 }
@@ -110,15 +143,14 @@ async function handle(request) {
   return redirect(`/login?next=${encodeURIComponent(url.pathname + url.search)}`);
 }
 
-// Будь-яка неочікувана помилка — коротке пояснення замість безликого 500
-// (без змінних середовища; повний стек — у Vercel → Logs).
+// Будь-яка неочікувана помилка — загальна відповідь 500 без подробиць
+// (подробиці лише в Vercel → Logs, щоб не показувати внутрішню будову стороннім).
 export default async function middleware(request) {
   try {
     return await handle(request);
   } catch (error) {
     console.error("[hermes middleware]", error);
-    const detail = `${error?.name || "Error"}: ${String(error?.message || error).slice(0, 300)}`;
-    return new Response(`Hermes middleware error\n\n${detail}\n`, {
+    return new Response("Hermes: internal error. Details are in Vercel → Logs.\n", {
       status: 500,
       headers: { "Content-Type": "text/plain; charset=utf-8", ...NO_STORE },
     });

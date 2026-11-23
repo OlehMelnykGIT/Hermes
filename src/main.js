@@ -8,6 +8,7 @@ import "./styles/index.css";
 import { LANGUAGES, getLang, setLang, t } from "./i18n/index.js";
 import { configReady } from "./lib/config.js";
 import { html } from "./lib/html.js";
+import { AUTHOR } from "./lib/author.js";
 import { icon, skeleton } from "./lib/ui.js";
 import { files } from "./pages/scripts/files.js";
 
@@ -56,6 +57,19 @@ function sheetLink(url) {
   </a>`;
 }
 
+function footer() {
+  return html`<footer class="site-footer">
+    <div class="footer-inner">
+      <span class="footer-brand"><span class="brand-mark">INB</span>Hermes</span>
+      <p class="footer-author">
+        <span class="muted">${t("footer.roles")}</span>
+        <strong>${AUTHOR.name}</strong>
+        <span class="footer-position">${AUTHOR.position} · ${AUTHOR.department}</span>
+      </p>
+    </div>
+  </footer>`;
+}
+
 function header(route) {
   return html`<header class="site-header">
     <div class="header-inner">
@@ -97,7 +111,7 @@ async function renderApp() {
 
   unmount();
   unmount = () => {};
-  app.innerHTML = html`${header(route)}<main id="view" class="container">${skeleton(4)}</main>`;
+  app.innerHTML = html`${header(route)}<main id="view" class="container">${skeleton(4)}</main>${footer()}`;
 
   const mount = await page.load();
   if (id !== renderId) return;

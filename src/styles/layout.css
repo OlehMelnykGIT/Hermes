@@ -323,3 +323,64 @@
         padding-right: 8px;
     }
 }
+
+/* ---------- Підвал: автор проєкту ---------- */
+
+.site-footer {
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+}
+
+.footer-inner {
+    width: min(var(--page-width), 100% - 32px);
+    margin-inline: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 24px;
+    padding: 18px 0;
+    font-size: 13px;
+}
+
+.footer-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 750;
+}
+
+.footer-brand .brand-mark {
+    padding: 3px 7px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, var(--neon-from), var(--neon-to));
+    font-size: 11px;
+}
+
+.footer-author {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    margin: 0;
+}
+
+.footer-position {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Підвал притиснутий донизу навіть на короткій сторінці */
+#app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+#app > main {
+    flex: 1;
+}

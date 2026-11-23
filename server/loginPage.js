@@ -3,6 +3,7 @@
 
 import pl from "../src/i18n/pl.json" with { type: "json" };
 import uk from "../src/i18n/uk.json" with { type: "json" };
+import { AUTHOR } from "../src/lib/author.js";
 import { html, raw } from "../src/lib/html.js";
 
 const dictionaries = { pl, uk };
@@ -40,6 +41,8 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px}
 button{width:100%;margin-top:16px;font:inherit;font-weight:650;padding:12px;border:0;border-radius:10px;background:var(--accent);color:var(--on-accent);cursor:pointer}
 .error{margin:12px 0 0;padding:10px 12px;border-radius:8px;background:var(--error-bg);color:var(--error);font-weight:600}
 .hint{font-size:13px;margin:22px 0 0}
+.author{margin:18px 0 0;padding-top:14px;border-top:1px solid var(--line);font-size:12px;line-height:1.5}
+.author strong{color:var(--text)}
 `);
 
 // lang: "pl" | "uk"; nextPath: куди повернутися після входу; errorKey: ключ перекладу або null.
@@ -77,6 +80,7 @@ export function renderLoginPage({ lang, nextPath, errorKey }) {
     <button type="submit">${t("login.submit")}</button>
   </form>
   <p class="hint">${t("login.hint")}</p>
+  <p class="author">${t("footer.roles")}:<br><strong>${AUTHOR.name}</strong> · ${AUTHOR.position} · ${AUTHOR.department}</p>
 </main>
 </body>
 </html>`.toString();

@@ -3,13 +3,14 @@
 
 import assert from "node:assert/strict";
 import { beforeEach, describe, test } from "node:test";
-import middleware from "../middleware.js";
+import middleware, { resetLoginLimits } from "../middleware.js";
 import { createSession, sameOrigin, verifySession } from "../server/session.js";
 
 const SITE = "https://hermes.example";
 const PASSWORD = "test-password";
 
 function setEnv() {
+  resetLoginLimits();
   process.env.SITE_PASSWORD = PASSWORD;
   process.env.SESSION_SECRET = "s".repeat(40);
 }
@@ -145,5 +146,27 @@ describe("Vercel: внутрішня адреса http://, браузер на h
   test("Origin: null (браузер з no-referrer) не приймається", () => {
     const req = new Request(`${SITE}/login`, { method: "POST", headers: { origin: "null" } });
     assert.equal(sameOrigin(req), false);
+  });
+});
+
+describe("захист від перебору пароля", () => {
+  beforeEach(setEnv);
+  const attempt = (password, ip) =>
+    middleware(loginForm(password, "/", { origin: SITE, "x-forwarded-for": ip }));
+
+  test("після 10 невдалих спроб з однієї IP — 429, навіть з правильним паролем; інші IP не зачеплено", async () => {
+    await Promise.all(Array.from({ length: 10 }, () => attempt("wrong", "203.0.113.7")));
+    const locked = await attempt(PASSWORD, "203.0.113.7");
+    assert.equal(locked.status, 429);
+    assert.match(await locked.text(), /Zbyt wiele/);
+    assert.equal((await attempt(PASSWORD, "198.51.100.1")).status, 303);
+  });
+
+  test("помилка всередині не показує подробиць", async () => {
+    const broken = new Request(`${SITE}/login`, { method: "POST", headers: { origin: SITE } });
+    Object.defineProperty(broken, "formData", { value: () => { throw new Error("secret detail"); } });
+    const response = await middleware(broken);
+    assert.equal(response.status, 500);
+    assert.doesNotMatch(await response.text(), /secret detail/);
   });
 });

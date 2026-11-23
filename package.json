@@ -2,6 +2,8 @@
   "name": "hermes",
   "version": "1.0.0",
   "private": true,
+  "description": "INB Hermes — robocza strona działu Inbound",
+  "author": "Oleh Melnyk (Operator CL, Inbound Dep)",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -1,4 +1,4 @@
-# Hermes
+# INB Hermes
 
 Робочий сайт для складу: фури та брами наживо з Google Таблиці, команда на зміні,
 макроси VBA для Excel і посилання. Двомовний (PL за замовчуванням / UA), закритий паролем,
@@ -6,7 +6,7 @@
 
 | Сторінка | Що показує |
 | --- | --- |
-| **Fury / Bramy** | Аркуш Rozładunek: прогрес дня, найближчий дедлайн, відлік часу, фільтр статусів |
+| **Rozładunek** | Аркуш Rozładunek: прогрес дня, дедлайни, Replen / Stol B3, закриті дні; блок NCG за датами |
 | **Zespół** | Аркуш Zespół: хто в якому процесі, розподіл перерв, UDT / VNA |
 | **Makra VBA** | Код макросів (перегляд, копіювання, завантаження) і посилання з аркуша Linki |
 
@@ -50,7 +50,7 @@ npm run build                # збірка в dist/
 | --- | --- |
 | `SITE_PASSWORD` | пароль для входу |
 | `SESSION_SECRET` | секрет сесій, мін. 32 символи (`openssl rand -base64 48`) |
-| `SHEET_URL` | посилання на Google Таблицю (кнопка «Arkusz» у шапці) |
+| `SHEET_URL` | посилання на Google Таблицю (посилання «Replenishment SLA» у шапці) |
 | `SHEET_API_URL` | адреса Apps Script Web App (закінчується на `/exec`) |
 | `SHEET_API_TOKEN` | токен читання (`API_TOKEN` в Apps Script) |
 | `SHEET_API_WRITE_TOKEN` | токен запису аркуша Linki (`API_WRITE_TOKEN` в Apps Script) |
@@ -73,3 +73,8 @@ npm run build                # збірка в dist/
 
 Після зміни `Api.gs`: **Deploy → Manage deployments → Edit → Version: New version → Deploy**
 (Execute as: **Me**, Who has access: **Anyone**). Адреса `/exec` не змінюється.
+
+## Автор
+
+**Oleh Melnyk** — автор проєкту, головний розробник і модератор сайту.
+Operator CL · Inbound Dep.
