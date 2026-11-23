@@ -1,26 +1,67 @@
-// Читання таблиці для сторінок «Fury / Bramy» і «Zespół». Токен лише на сервері.
+// GET /api/sheet — дані таблиці для всіх сторінок (FBO, дні, статистика, Zespół, Linki).
+// Токен читання лишається на сервері; у браузер ідуть лише перевірені поля.
+//
+// Короткий кеш у пам'яті сервера: Apps Script відповідає 3–4 с, а сторінку одночасно
+// відкривають кілька ПК і щохвилини оновлюють. Перший запит іде в таблицю, наступні
+// протягом CACHE_MS отримують ту саму відповідь миттєво; одночасні запити чекають
+// одну спільну відповідь. ?fresh=1 (кнопка «Odśwież») завжди бере свіжі дані.
+// Кеш лише в пам'яті функції — ні в браузері, ні на диску.
 
+import { fail, json } from "../server/http.js";
 import { isAuthenticated } from "../server/session.js";
-import { errorStatus, getSheet, normalizeLinks, normalizeTeam, table } from "../server/sheetApi.js";
+import {
+  errorStatus,
+  getSheet,
+  normalizeDays,
+  normalizeLinks,
+  normalizeStats,
+  normalizeTeam,
+  table,
+} from "../server/sheetApi.js";
+
+const CACHE_MS = 25_000;
+
+let cached = null; // { at, body }
+let inflight = null; // спільний запит до Apps Script, поки він триває
+
+function toBody(data) {
+  return {
+    updated: typeof data.updated === "string" ? data.updated : null,
+    fbo: table(data.fbo) ?? [],
+    team: normalizeTeam(data.team),
+    links: normalizeLinks(data.links),
+    days: normalizeDays(data.days),
+    stats: normalizeStats(data.stats),
+    // Необов'язкові поля: з'являться на сайті, щойно Api.gs почне їх віддавати.
+    euro: typeof data.euro === "string" ? data.euro : null,
+    fboColors: table(data.fboColors),
+    ncg: table(data.ncg),
+    ncgColors: table(data.ncgColors),
+  };
+}
+
+function loadFromSheet() {
+  inflight ??= getSheet(process.env).finally(() => {
+    inflight = null;
+  });
+  return inflight;
+}
 
 export async function GET(request) {
-  const headers = { "Cache-Control": "no-store" };
-  if (!(await isAuthenticated(request))) return Response.json({ error: "unauthorized" }, { status: 401, headers });
+  if (!(await isAuthenticated(request))) return fail("unauthorized", 401);
 
-  const { data, error } = await getSheet(process.env);
-  if (error) return Response.json({ error }, { status: errorStatus(error), headers });
+  const fresh = new URL(request.url).searchParams.has("fresh");
+  if (!fresh && cached && Date.now() - cached.at < CACHE_MS) return json(cached.body);
 
-  return Response.json(
-    {
-      updated: typeof data.updated === "string" ? data.updated : null,
-      euro: typeof data.euro === "string" ? data.euro : null,
-      fbo: table(data.fbo) ?? [],
-      fboColors: table(data.fboColors),
-      ncg: table(data.ncg),
-      ncgColors: table(data.ncgColors),
-      team: normalizeTeam(data.team),
-      links: normalizeLinks(data.links),
-    },
-    { headers },
-  );
+  const { data, error } = await loadFromSheet();
+  if (error) return fail(error, errorStatus(error));
+
+  cached = { at: Date.now(), body: toBody(data) };
+  return json(cached.body);
+}
+
+// Для тестів: очистити кеш між перевірками.
+export function resetCache() {
+  cached = null;
+  inflight = null;
 }

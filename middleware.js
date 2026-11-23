@@ -1,9 +1,16 @@
 // Vercel Routing Middleware: закриває паролем увесь сайт, включно з /api/*.
-// Без дійсної сесії сторінки перенаправляються на /login, а API повертає 401.
+//
+//   GET  /login   — сторінка входу (або назад на сайт, якщо вже увійшли)
+//   POST /login   — перевірка пароля, cookie сесії
+//   POST /logout  — вихід
+//   /favicon.svg  — публічно
+//   усе інше      — пропускаємо далі з дійсною сесією; інакше /login (сторінки) або 401 (API)
+//
+// Працює в Node.js-середовищі Vercel без збирання, тому імпорт JSON має «with { type: "json" }».
 
-import { next } from "@vercel/functions/middleware";
-import pl from "./src/i18n/pl.json" with { type: "json" };
-import uk from "./src/i18n/uk.json" with { type: "json" };
+import { next as continueRequest } from "@vercel/functions/middleware";
+import { NO_STORE } from "./server/http.js";
+import { LOGIN_HEADERS, renderLoginPage } from "./server/loginPage.js";
 import {
   authConfigured,
   createSession,
@@ -14,129 +21,97 @@ import {
   sessionCookie,
 } from "./server/session.js";
 
-// Node.js-середовище: повний process.env і Web Crypto без обмежень Edge.
 export const config = { runtime: "nodejs", matcher: "/:path*" };
 
-const dictionaries = { pl, uk };
-const FAILED_LOGIN_DELAY_MS = 800;
+const FAILED_LOGIN_DELAY_MS = 800; // ускладнює перебір паролів
 
-const LOGIN_HEADERS = {
-  "Content-Type": "text/html; charset=utf-8",
-  "Cache-Control": "no-store",
-  "Content-Security-Policy":
-    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
-  "X-Frame-Options": "DENY",
-  "X-Content-Type-Options": "nosniff",
-  "Referrer-Policy": "same-origin",
-  "X-Robots-Tag": "noindex, nofollow",
-};
+// ===================== Допоміжне =====================
 
-function escapeHtml(value) {
-  return String(value).replace(
-    /[&<>"']/g,
-    (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char],
-  );
-}
-
-function pickLang(value) {
-  return value === "uk" ? "uk" : value === "pl" ? "pl" : null;
-}
+const validLang = (value) => (value === "pl" || value === "uk" ? value : null);
 
 function cookieLang(request) {
-  const match = /(?:^|;\s*)hermes_lang=(pl|uk)\b/.exec(request.headers.get("cookie") || "");
-  return match ? match[1] : "pl";
+  return /(?:^|;\s*)hermes_lang=(pl|uk)\b/.exec(request.headers.get("cookie") || "")?.[1] || "pl";
 }
 
-// Дозволяємо лише внутрішні шляхи, щоб не було відкритого редиректу.
-function safeNext(value) {
+// Куди повернутися після входу: лише внутрішні шляхи (захист від відкритого редиректу).
+function safeNextPath(value) {
   if (typeof value !== "string" || !value.startsWith("/")) return "/";
   if (value.startsWith("//") || value.startsWith("/\\") || value.startsWith("/login")) return "/";
   return value;
 }
 
-// Відносний Location (лише шлях): браузер лишається на тому самому домені й https,
-// незалежно від того, яку внутрішню адресу бачить сервер. location завжди починається з «/».
-function redirect(_url, location, headers = {}) {
-  return new Response(null, {
-    status: 303,
-    headers: { Location: location, "Cache-Control": "no-store", ...headers },
+// Відносний Location: браузер лишається на своєму домені й https, хоч би яку
+// внутрішню адресу (http://…) бачив сервер.
+function redirect(path, headers = {}) {
+  return new Response(null, { status: 303, headers: { Location: path, ...NO_STORE, ...headers } });
+}
+
+function loginResponse({ lang, nextPath, errorKey = null, status = 200, headers = {} }) {
+  return new Response(renderLoginPage({ lang, nextPath, errorKey }), {
+    status,
+    headers: { ...LOGIN_HEADERS, ...headers },
   });
 }
 
-function loginPage({ lang, next, error, status = 200, headers = {} }) {
-  const t = (key) => dictionaries[lang][key] ?? pl[key] ?? "";
-  const langLink = (code, label) =>
-    code === lang
-      ? `<span aria-current="true">${label}</span>`
-      : `<a href="/login?lang=${code}&amp;next=${encodeURIComponent(next)}" hreflang="${code}">${label}</a>`;
-  const html = `<!doctype html>
-<html lang="${lang}">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
-<title>${escapeHtml(t("login.pageTitle"))}</title>
-<style>
-:root{--bg:#f5f6f2;--card:#fff;--text:#202b29;--muted:#64706a;--line:#dce1d8;--accent:#317659;--error:#b3261e;color-scheme:light dark}
-@media (prefers-color-scheme:dark){:root{--bg:#141a18;--card:#1c2421;--text:#e6ebe7;--muted:#9aa69f;--line:#2e3a35;--accent:#5fb38c;--error:#f2b8b5}}
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-main{width:min(380px,100%);background:var(--card);border:1px solid var(--line);border-radius:16px;padding:28px}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
-.brand{font-weight:750;font-size:21px;color:var(--accent)}.brand span{color:var(--text)}
-.lang{display:flex;gap:4px;font-size:13px;font-weight:600}
-.lang a,.lang span{padding:6px 9px;border-radius:8px;color:var(--muted);text-decoration:none}
-.lang span{background:var(--bg);color:var(--text)}
-h1{font-size:24px;margin:0 0 8px}p{color:var(--muted);margin:0 0 20px;line-height:1.45}
-label{display:block;font-weight:600;font-size:14px;margin-bottom:6px}
-input{width:100%;font:inherit;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text)}
-input:focus{outline:2px solid var(--accent);outline-offset:1px}
-button{width:100%;margin-top:16px;font:inherit;font-weight:650;padding:12px;border:0;border-radius:10px;background:var(--accent);color:#fff;cursor:pointer}
-.error{color:var(--error);font-weight:600;margin:12px 0 0}
-.hint{font-size:13px;margin:20px 0 0}
-</style>
-</head>
-<body>
-<main>
-<div class="top"><div class="brand">H<span>ermes</span></div><nav class="lang" aria-label="Język / Мова">${langLink("pl", "PL")}${langLink("uk", "UA")}</nav></div>
-<h1>${escapeHtml(t("login.heading"))}</h1>
-<p>${escapeHtml(t("login.lead"))}</p>
-<form method="post" action="/login">
-<input type="hidden" name="next" value="${escapeHtml(next)}">
-<input type="hidden" name="lang" value="${lang}">
-<label for="password">${escapeHtml(t("login.password"))}</label>
-<input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
-${error ? `<p class="error" role="alert">${escapeHtml(t(error))}</p>` : ""}
-<button type="submit">${escapeHtml(t("login.submit"))}</button>
-</form>
-<p class="hint">${escapeHtml(t("login.hint"))}</p>
-</main>
-</body>
-</html>`;
-  return new Response(html, { status, headers: { ...LOGIN_HEADERS, ...headers } });
+const forbidden = () => new Response("Forbidden", { status: 403, headers: NO_STORE });
+
+// ===================== Обробники =====================
+
+async function showLogin(request, env, url) {
+  const nextPath = safeNextPath(url.searchParams.get("next"));
+  if (await isAuthenticated(request, env)) return redirect(nextPath);
+  const chosenLang = validLang(url.searchParams.get("lang"));
+  return loginResponse({
+    lang: chosenLang || cookieLang(request),
+    nextPath,
+    errorKey: authConfigured(env) ? null : "login.notConfigured",
+    headers: chosenLang ? { "Set-Cookie": langCookie(request, chosenLang) } : {},
+  });
 }
 
-async function handleLogin(request, env) {
-  if (!sameOrigin(request)) return new Response("Forbidden", { status: 403 });
+async function submitLogin(request, env) {
+  if (!sameOrigin(request)) return forbidden();
   const form = await request.formData().catch(() => null);
-  const next = safeNext(form?.get("next"));
-  const lang = pickLang(form?.get("lang")) || cookieLang(request);
+  const nextPath = safeNextPath(form?.get("next"));
+  const lang = validLang(form?.get("lang")) || cookieLang(request);
 
   if (!authConfigured(env)) {
-    return loginPage({ lang, next, error: "login.notConfigured", status: 500 });
+    return loginResponse({ lang, nextPath, errorKey: "login.notConfigured", status: 500 });
   }
   if (await passwordMatches(env, form?.get("password"))) {
-    return redirect(request.url, next, {
-      "Set-Cookie": sessionCookie(request, await createSession(env)),
-    });
+    return redirect(nextPath, { "Set-Cookie": sessionCookie(request, await createSession(env)) });
   }
-  // Невелика затримка ускладнює перебір паролів.
   await new Promise((resolve) => setTimeout(resolve, FAILED_LOGIN_DELAY_MS));
-  return loginPage({ lang, next, error: "login.error", status: 401 });
+  return loginResponse({ lang, nextPath, errorKey: "login.error", status: 401 });
 }
 
-// Помилка middleware не повинна перетворюватися на «500 MIDDLEWARE_INVOCATION_FAILED» без пояснень.
-// Показуємо лише тип і текст помилки (без змінних середовища), повний стек — у Vercel → Logs.
+function logout(request) {
+  if (request.method !== "POST") return new Response(null, { status: 405, headers: { Allow: "POST" } });
+  if (!sameOrigin(request)) return forbidden();
+  return redirect("/login", { "Set-Cookie": sessionCookie(request, "", 0) });
+}
+
+async function handle(request) {
+  const env = process.env;
+  const url = new URL(request.url);
+
+  if (url.pathname === "/login") {
+    return request.method === "POST" ? submitLogin(request, env) : showLogin(request, env, url);
+  }
+  if (url.pathname === "/logout") return logout(request);
+  // Іконка вкладки — публічна (потрібна й на сторінці входу, даних не містить).
+  if (url.pathname === "/favicon.svg") return continueRequest();
+
+  if (await isAuthenticated(request, env)) return continueRequest();
+
+  if (url.pathname.startsWith("/api/")) {
+    return Response.json({ error: "unauthorized" }, { status: 401, headers: NO_STORE });
+  }
+  return redirect(`/login?next=${encodeURIComponent(url.pathname + url.search)}`);
+}
+
+// Будь-яка неочікувана помилка — коротке пояснення замість безликого 500
+// (без змінних середовища; повний стек — у Vercel → Logs).
 export default async function middleware(request) {
   try {
     return await handle(request);
@@ -145,38 +120,7 @@ export default async function middleware(request) {
     const detail = `${error?.name || "Error"}: ${String(error?.message || error).slice(0, 300)}`;
     return new Response(`Hermes middleware error\n\n${detail}\n`, {
       status: 500,
-      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+      headers: { "Content-Type": "text/plain; charset=utf-8", ...NO_STORE },
     });
   }
-}
-
-async function handle(request) {
-  const env = process.env;
-  const url = new URL(request.url);
-
-  if (url.pathname === "/login") {
-    if (request.method === "POST") return handleLogin(request, env);
-    const next = safeNext(url.searchParams.get("next"));
-    if (await isAuthenticated(request, env)) return redirect(url, next);
-    const chosen = pickLang(url.searchParams.get("lang"));
-    return loginPage({
-      lang: chosen || cookieLang(request),
-      next,
-      error: authConfigured(env) ? null : "login.notConfigured",
-      headers: chosen ? { "Set-Cookie": langCookie(request, chosen) } : {},
-    });
-  }
-
-  if (url.pathname === "/logout") {
-    if (request.method !== "POST") return new Response(null, { status: 405, headers: { Allow: "POST" } });
-    if (!sameOrigin(request)) return new Response("Forbidden", { status: 403 });
-    return redirect(url, "/login", { "Set-Cookie": sessionCookie(request, "", 0) });
-  }
-
-  if (await isAuthenticated(request, env)) return next(); // пропускаємо далі
-
-  if (url.pathname.startsWith("/api/")) {
-    return Response.json({ error: "unauthorized" }, { status: 401, headers: { "Cache-Control": "no-store" } });
-  }
-  return redirect(url, `/login?next=${encodeURIComponent(url.pathname + url.search)}`);
 }

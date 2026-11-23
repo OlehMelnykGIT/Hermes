@@ -1,0 +1,107 @@
+/* =====================================================================
+   Дизайн-токени: кольори, відступи, радіуси.
+   Усі інші файли використовують лише ці змінні — колір змінюється в одному місці.
+   Темна тема вмикається автоматично за налаштуваннями системи.
+   ===================================================================== */
+
+:root {
+    color-scheme: light;
+
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+
+    --radius: 14px;
+    --radius-sm: 8px;
+    --gap: 16px;
+    --page-width: 1180px;
+
+    /* Поверхні й текст */
+    --bg: #f4f5f1;
+    --surface: #ffffff;
+    --surface-2: #f8f9f6;
+    --text: #1f2a27;
+    --muted: #667269;
+    --line: #dde2da;
+    --line-soft: #edf0ea;
+    --shadow: 0 1px 2px rgb(20 30 25 / 6%), 0 4px 16px rgb(20 30 25 / 5%);
+    --shadow-hover: 0 2px 4px rgb(20 30 25 / 8%), 0 10px 28px rgb(20 30 25 / 9%);
+
+    /* Акцент (зелений Hermes) */
+    --accent: #2f7457;
+    --accent-hover: #255e46;
+    --accent-soft: #e5efe8;
+    --on-accent: #ffffff;
+
+    /* Тони для статусів і процесів: -fg — текст/смуга, -bg — фон плашки */
+    --blue-fg: #1d5fa8;   --blue-bg: #e3eefb;
+    --green-fg: #1f6640;  --green-bg: #dcf1e4;
+    --amber-fg: #855600;  --amber-bg: #fcefd2;
+    --purple-fg: #6a3fa0; --purple-bg: #efe7fa;
+    --grey-fg: #4b5560;   --grey-bg: #eceff2;
+    --red-fg: #a3332a;    --red-bg: #fbe4e2;
+    --orange-fg: #a0480f; --orange-bg: #fde8d9;
+    --teal-fg: #0f6b69;   --teal-bg: #daf1ef;
+
+    --code-bg: #1b2622;
+    --code-text: #dce8df;
+
+    /* Синьо-зелений неон (у тон зеленому акценту) — знак «INB Hermes» і смуга вгорі шапки */
+    --neon-from: #12b8b0;
+    --neon-to: #2e9a63;
+    --neon-glow: rgb(20 190 160 / 45%);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+
+        --bg: #111715;
+        --surface: #19211e;
+        --surface-2: #1e2824;
+        --text: #e5ebe7;
+        --muted: #98a59e;
+        --line: #2b3732;
+        --line-soft: #232e2a;
+        --shadow: 0 1px 2px rgb(0 0 0 / 30%);
+        --shadow-hover: 0 4px 20px rgb(0 0 0 / 40%);
+
+        --accent: #5bb389;
+        --accent-hover: #74c49d;
+        --accent-soft: #1d3329;
+        --on-accent: #0d1a14;
+
+        --blue-fg: #9cc3f5;   --blue-bg: #1b2c42;
+        --green-fg: #8fd6ac;  --green-bg: #173224;
+        --amber-fg: #f0c674;  --amber-bg: #392d12;
+        --purple-fg: #cdb2f0; --purple-bg: #2d2140;
+        --grey-fg: #c0c8cf;   --grey-bg: #283035;
+        --red-fg: #f2aaa4;    --red-bg: #3c1c1a;
+        --orange-fg: #f5b48a; --orange-bg: #3b2414;
+        --teal-fg: #8fd8d4;   --teal-bg: #15322f;
+
+        --code-bg: #0c1210;
+
+        --neon-from: #2fe0c8;
+        --neon-to: #5bb389;
+        --neon-glow: rgb(60 225 185 / 55%);
+    }
+}
+
+/* ---------- Тон за статусом фури ---------- */
+.status--yard       { --tone-fg: var(--grey-fg);   --tone-bg: var(--grey-bg); }
+.status--unloaded   { --tone-fg: var(--blue-fg);   --tone-bg: var(--blue-bg); }
+.status--advice     { --tone-fg: var(--amber-fg);  --tone-bg: var(--amber-bg); }
+.status--masterdata { --tone-fg: var(--purple-fg); --tone-bg: var(--purple-bg); }
+.status--stowed     { --tone-fg: var(--green-fg);  --tone-bg: var(--green-bg); }
+.status--left_shift { --tone-fg: var(--teal-fg);   --tone-bg: var(--teal-bg); }
+.status--suspended  { --tone-fg: var(--orange-fg); --tone-bg: var(--orange-bg); }
+.status--no_advice  { --tone-fg: var(--red-fg);    --tone-bg: var(--red-bg); }
+.status--closed     { --tone-fg: var(--green-fg);  --tone-bg: var(--green-bg); }
+.status--none       { --tone-fg: var(--muted);     --tone-bg: var(--surface-2); }
+
+/* ---------- Тон за процесом (сторінка «Zespół») ---------- */
+.proc--unloading     { --tone-fg: var(--blue-fg);   --tone-bg: var(--blue-bg); }
+.proc--stowing       { --tone-fg: var(--green-fg);  --tone-bg: var(--green-bg); }
+.proc--replenishment { --tone-fg: var(--amber-fg);  --tone-bg: var(--amber-bg); }
+.proc--leader        { --tone-fg: var(--purple-fg); --tone-bg: var(--purple-bg); }
+.proc--other         { --tone-fg: var(--grey-fg);   --tone-bg: var(--grey-bg); }

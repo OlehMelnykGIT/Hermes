@@ -3,6 +3,7 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "regions": ["fra1"],
   "headers": [
     {
       "source": "/(.*)",

@@ -1,67 +1,75 @@
 # Hermes
 
-Сайт на Vite та звичайному JavaScript для перегляду `StolPaletB3.txt` і `ReplenPrint.txt`.
-Можна вибрати файл, переглянути код, скопіювати або завантажити його.
-Макроси виконуються в Excel; сайт показує їхній код.
+Робочий сайт для складу: фури та брами наживо з Google Таблиці, команда на зміні,
+макроси VBA для Excel і посилання. Двомовний (PL за замовчуванням / UA), закритий паролем,
+працює на Vercel.
 
-## Запуск
+| Сторінка | Що показує |
+| --- | --- |
+| **Fury / Bramy** | Аркуш Rozładunek: прогрес дня, найближчий дедлайн, відлік часу, фільтр статусів |
+| **Zespół** | Аркуш Zespół: хто в якому процесі, розподіл перерв, UDT / VNA |
+| **Makra VBA** | Код макросів (перегляд, копіювання, завантаження) і посилання з аркуша Linki |
 
-Потрібен Node.js 22.12+ або 20.19+.
+## Структура
+
+```text
+middleware.js         пароль на весь сайт (/login, /logout, перевірка сесії)
+api/                  серверні функції Vercel: config, sheet (читання), links (запис)
+server/               спільний серверний код: сесія, запити до Apps Script, сторінка входу
+src/
+  main.js             шапка, мова, маршрути (#/trucks, #/team, #/scripts)
+  i18n/               pl.json, uk.json — усі тексти інтерфейсу
+  lib/                html (безпечні шаблони), api, sheet (одне джерело даних), ui, storage
+  pages/<сторінка>/   model.js — логіка без DOM, view.js — розмітка й події
+  styles/             tokens (кольори, темна тема), base, layout, components, сторінки
+tests/                npm test — вхід, API, логіка сторінок
+StolPaletB3.txt       макроси VBA (сайт показує їх як є)
+ReplenPrint.txt
+```
+
+## Локальний запуск
+
+Потрібен Node.js 22+.
 
 ```sh
 npm install
-npm run dev
+cp .env.example .env.local   # і заповнити значення
+npm run dev                  # http://localhost:5173 — з даними з таблиці, без сторінки входу
+npm test                     # тести
+npm run build                # збірка в dist/
 ```
 
-Відкрийте адресу з термінала (зазвичай http://localhost:5173).
+Повна перевірка з паролем, як на Vercel: `npx vercel dev`.
 
-## Збірка
+## Змінні середовища
 
-```sh
-npm run build
-npm run preview
-```
+Задаються у Vercel → **Settings → Environment Variables** (Production і Preview),
+локально — у `.env.local`. Шаблон: [.env.example](.env.example).
 
-Для статичного хостингу використовуйте папку `dist/`. Відносні шляхи підтримують розміщення в підкаталозі.
-Редагуйте початкові `.txt` файли в корені: Vite підхоплює їх без дублювання.
-Копіювання використовує Clipboard API та потребує localhost або HTTPS.
+| Змінна | Призначення |
+| --- | --- |
+| `SITE_PASSWORD` | пароль для входу |
+| `SESSION_SECRET` | секрет сесій, мін. 32 символи (`openssl rand -base64 48`) |
+| `SHEET_URL` | посилання на Google Таблицю (кнопка «Arkusz» у шапці) |
+| `SHEET_API_URL` | адреса Apps Script Web App (закінчується на `/exec`) |
+| `SHEET_API_TOKEN` | токен читання (`API_TOKEN` в Apps Script) |
+| `SHEET_API_WRITE_TOKEN` | токен запису аркуша Linki (`API_WRITE_TOKEN` в Apps Script) |
 
-## Деплой на Vercel
-
-Увесь сайт, включно з `/api/*`, закритий паролем через [middleware.js](middleware.js).
-Без змінних середовища сайт нікого не пускає (fail closed).
-
-1. На <https://vercel.com> → **Add New → Project** імпортуйте цей репозиторій.
-   Налаштування збірки беруться з [vercel.json](vercel.json).
-2. **Settings → Environment Variables** (Production і Preview), див. [.env.example](.env.example):
-   - `SITE_PASSWORD`: пароль для входу (довгий, не такий, як у робочих акаунтах);
-   - `SESSION_SECRET`: `openssl rand -base64 48`;
-   - `SHEET_URL`: посилання на Google Таблицю (кнопка «Arkusz» у шапці);
-   - `EXCEL_URL`: посилання на таблицю Excel у SharePoint (запасне, поки аркуш Linki порожній);
-   - `SHEET_API_URL`, `SHEET_API_TOKEN`, `SHEET_API_WRITE_TOKEN`: Apps Script Web App.
-3. **Deployments → Redeploy**, щоб змінні підхопилися.
-4. **Settings → Deployment Protection**: Preview-деплої теж залиште закритими.
-
-Зміна `SITE_PASSWORD` або `SESSION_SECRET` розлогінює всіх. Сесія живе 12 годин.
-
-Локально: `npm run dev` бере змінні з `.env.local` (він у `.gitignore`) і запускає `/api/*`,
-але без сторінки входу. Повна перевірка з паролем: `npx vercel dev`.
+Після зміни змінних — **Deployments → Redeploy**. Зміна `SITE_PASSWORD` або `SESSION_SECRET`
+розлогінює всіх; сесія живе 12 годин. Без пароля й секрету сайт нікого не пускає.
 
 **Ніколи не комітьте** паролі, токени, посилання на таблицю чи робочі дані.
 
 ## Дані з Google Таблиці
 
-Браузер → `/api/sheet`, `/api/links` (Vercel, перевіряють сесію) → Apps Script Web App (перевіряє токен).
-Токени є лише у змінних Vercel і в Apps Script, у браузер вони не потрапляють.
+Браузер → `/api/*` на Vercel (перевіряє сесію) → Apps Script Web App (перевіряє токен).
+Токени є лише на сервері, у браузер вони не потрапляють.
 
-- `GET` (`SHEET_API_TOKEN`) → `{ updated, fbo, team, links }`: сторінки «Fury / Bramy», «Zespół», «Makra VBA».
-- `POST` (`SHEET_API_WRITE_TOKEN`) `{ action: "saveLinks", links }`: кнопка «Edytuj» в посиланнях; замінює весь аркуш Linki.
-- З аркуша Zespół на сайт потрапляють лише Osoba (ім'я + ініціал), Zmiana, Proces teraz, Przerwa, UDT / VNA, Uwagi.
+- `GET` → `{ updated, fbo, team, links }` — усі сторінки; оновлюється щохвилини.
+- `POST` `{ action: "saveLinks", links }` — кнопка «Edytuj»; замінює весь список в аркуші Linki.
+- З аркуша Zespół на сайт потрапляють лише ім'я з ініціалом, зміна, процес, перерва, UDT / VNA і примітка.
+- Необов'язкові поля `euro`, `fboColors`, `ncg`, `ncgColors` — сайт покаже EURO (I1), кольори днів
+  і таблицю NCG, щойно `Api.gs` почне їх віддавати.
 
 Після зміни `Api.gs`: **Deploy → Manage deployments → Edit → Version: New version → Deploy**
-(Execute as: **Me**, Who has access: **Anyone**). URL `/exec` залишається тим самим.
-
-### Вимкнення GitHub Pages
-
-Після переходу на Vercel: **Settings → Pages → Unpublish site** і видаліть
-`.github/workflows/deploy.yml`, бо Pages публікує сайт без пароля.
+(Execute as: **Me**, Who has access: **Anyone**). Адреса `/exec` не змінюється.

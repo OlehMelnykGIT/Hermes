@@ -1,0 +1,138 @@
+/* =====================================================================
+   Сторінка «Makra VBA»: картки файлів, перегляд коду, посилання.
+   ===================================================================== */
+
+/* ---------- Картки файлів і посилань ---------- */
+
+.file-card,
+.link-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.file-card:hover,
+.link-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: var(--shadow-hover);
+}
+
+.file-card[aria-current] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.link-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.link-text strong {
+    font-size: 15px;
+}
+
+.link-text .muted {
+    overflow: hidden;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Опис файлу — повністю, з переносом рядків */
+.file-card .link-text .muted {
+    white-space: normal;
+}
+
+.link-card > .icon {
+    color: var(--muted);
+}
+
+.link-card:hover > .icon {
+    color: var(--accent);
+}
+
+/* ---------- Перегляд коду ---------- */
+
+.viewer {
+    margin-top: 16px;
+    overflow: hidden;
+}
+
+.viewer-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 16px 20px;
+}
+
+.viewer pre {
+    max-height: 620px;
+    margin: 0;
+    padding: 22px;
+    overflow: auto;
+    background: var(--code-bg);
+    color: var(--code-text);
+    font: 13px/1.75 var(--font-mono);
+    tab-size: 4;
+}
+
+.viewer-loading {
+    padding: 0 20px 16px;
+}
+
+.viewer-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 20px;
+}
+
+/* ---------- Редактор посилань ---------- */
+
+.links-editor {
+    display: grid;
+    gap: 10px;
+    padding: 18px;
+}
+
+.link-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 1fr) minmax(200px, 2fr) auto;
+    gap: 8px;
+}
+
+.link-row input {
+    min-width: 0;
+    padding: 9px 11px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+}
+
+@media (max-width: 760px) {
+    .card-grid--wide {
+        grid-template-columns: 1fr;
+    }
+
+    .link-row {
+        grid-template-columns: 1fr auto;
+    }
+
+    .link-row input[name="url"] {
+        grid-row: 2;
+        grid-column: 1 / -1;
+    }
+}

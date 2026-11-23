@@ -1,0 +1,257 @@
+/* =====================================================================
+   Каркас: шапка, навігація, контейнер сторінки, заголовки секцій.
+   ===================================================================== */
+
+.container,
+.header-inner {
+    width: min(var(--page-width), 100% - 32px);
+    margin-inline: auto;
+}
+
+.container {
+    padding-bottom: 48px;
+}
+
+/* ---------- Шапка (липка) ---------- */
+
+.site-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+}
+
+/* Тонка неонова смуга вгорі — у кольорах знака «INB» */
+.site-header::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 2px;
+    background: linear-gradient(90deg, var(--neon-from), var(--neon-to) 40%, transparent 80%);
+}
+
+.header-inner {
+    display: flex;
+    align-items: center;
+    gap: 12px 24px;
+    min-height: 64px;
+}
+
+/* Знак «INB Hermes» — одна неонова капсула: «INB» на градієнті, «Hermes» усередині рамки */
+.brand {
+    display: inline-flex;
+    align-items: stretch;
+    padding: 2px;
+    border-radius: 11px;
+    background: linear-gradient(135deg, var(--neon-from), var(--neon-to));
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--neon-from) 35%, transparent),
+        0 0 14px var(--neon-glow);
+    transition: box-shadow 0.2s;
+}
+
+.brand:hover {
+    box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--neon-from) 55%, transparent),
+        0 0 22px var(--neon-glow);
+}
+
+.brand-mark {
+    display: grid;
+    place-items: center;
+    padding: 0 9px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-shadow: 0 0 6px rgb(255 255 255 / 55%);
+}
+
+.brand-name {
+    display: grid;
+    place-items: center;
+    height: 30px;
+    padding: 0 12px;
+    border-radius: 9px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 17px;
+    font-weight: 750;
+    letter-spacing: -0.3px;
+}
+
+.main-nav {
+    display: flex;
+    gap: 4px;
+    margin-right: auto;
+}
+
+.main-nav a {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    transition: color 0.15s, background-color 0.15s;
+}
+
+.main-nav a:hover {
+    color: var(--text);
+    background: var(--surface-2);
+}
+
+.main-nav a[aria-current] {
+    color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.header-actions form {
+    margin: 0;
+}
+
+.lang-switch {
+    display: flex;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+}
+
+.lang-switch button {
+    border: 0;
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--muted);
+    background: transparent;
+    cursor: pointer;
+}
+
+.lang-switch button[aria-pressed="true"] {
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+/* ---------- Заголовок сторінки і секцій ---------- */
+
+.page-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 32px 0 20px;
+}
+
+.page-head p {
+    margin-top: 6px;
+}
+
+.page-title {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.page-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    margin-top: 2px;
+    border-radius: 12px;
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.page-icon .icon {
+    width: 24px;
+    height: 24px;
+}
+
+.page-actions,
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.section-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 32px 0 12px;
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 24px;
+    margin-bottom: 18px;
+}
+
+/* ---------- Телефон ---------- */
+
+@media (max-width: 760px) {
+    .header-inner {
+        flex-wrap: wrap;
+        padding: 10px 0 0;
+    }
+
+    .header-actions {
+        margin-left: auto;
+    }
+
+    /* Меню — окремий рядок на всю ширину, з прокруткою, якщо не вміщується */
+    .main-nav {
+        order: 3;
+        width: 100%;
+        margin: 0;
+        overflow-x: auto;
+        padding-bottom: 8px;
+    }
+
+    .main-nav a {
+        flex: 1;
+        justify-content: center;
+        white-space: nowrap;
+    }
+
+    .page-head {
+        padding-top: 22px;
+    }
+
+    .page-icon {
+        width: 36px;
+        height: 36px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* На вузькому екрані в меню лишаються іконки й короткий текст */
+    .main-nav a {
+        font-size: 13px;
+        padding: 8px;
+    }
+
+    .header-actions .button {
+        padding: 7px 10px;
+    }
+}

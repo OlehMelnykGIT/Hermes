@@ -6,6 +6,8 @@ const MAX_ROWS = 2000;
 const MAX_COLS = 30;
 export const MAX_LINKS = 50;
 
+// ===================== Запити до Apps Script =====================
+
 function baseUrl(env) {
   try {
     const url = new URL(env.SHEET_API_URL);
@@ -105,23 +107,56 @@ export function validateLinksInput(value) {
   return { links };
 }
 
-// ---------- Zespół: лише дозволені поля ----------
+// ---------- Дні (кнопки «Zakończ dzień» / «Nowy tydzień») ----------
+// [{ id, nr, fromRow, toRow, open, closedAt }] — номери рядків аркуша Rozładunek.
+// id — унікальний ID робочого дня (момент відкриття, yyyy-MM-ddTHH:mm:ss, час Варшави).
+// Межі днів беруться лише звідси, не з кольорів чи ліній.
 
-const TEAM_FIELDS = {
-  person: ["osoba", "person", "name", "imie"],
-  shift: ["zmiana", "shift"],
-  process: ["procesteraz", "proces", "process"],
-  break: ["przerwa", "break"],
-  udt: ["udtvna", "udt", "vna"],
-  notes: ["uwagi", "notes"],
-};
+const isInt = (value) => Number.isInteger(value);
+const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-const fieldKey = (value) => String(value ?? "").toLowerCase().replace(/[^a-z0-9ąćęłńóśźż]/g, "");
-
-function fieldFor(name) {
-  const key = fieldKey(name);
-  return Object.keys(TEAM_FIELDS).find((field) => TEAM_FIELDS[field].includes(key)) || null;
+export function normalizeDays(value) {
+  if (!Array.isArray(value)) return undefined;
+  return value.slice(-500).flatMap((day) => {
+    if (!day || !isInt(day.nr) || !isInt(day.fromRow) || !isInt(day.toRow) || day.fromRow < 2) return [];
+    const dateTime = (value) => (typeof value === "string" && DATE_TIME.test(value) ? value : null);
+    return [
+      {
+        id: dateTime(day.id),
+        nr: day.nr,
+        fromRow: day.fromRow,
+        toRow: day.toRow,
+        open: day.open === true,
+        closedAt: dateTime(day.closedAt),
+      },
+    ];
+  });
 }
+
+// ---------- Статистика днів ----------
+// [{ dayId, day, druk, lu }], найновіші першими, максимум 60.
+// dayId — точно дорівнює days[i].id; старі записи мають dayId лише з датою (з днями не збігаються).
+// day — дата відкриття робочого дня; druk — унікальні палети через Druk Replen; lu — LU з місцем.
+
+const count = (value) => (Number.isFinite(Number(value)) && Number(value) >= 0 ? Math.round(Number(value)) : 0);
+
+export function normalizeStats(value) {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .slice(0, 60)
+    .filter((entry) => entry && typeof entry.day === "string" && DATE.test(entry.day))
+    .map((entry) => ({
+      dayId: typeof entry.dayId === "string" && (DATE_TIME.test(entry.dayId) || DATE.test(entry.dayId)) ? entry.dayId : null,
+      day: entry.day,
+      druk: count(entry.druk),
+      lu: count(entry.lu),
+    }));
+}
+
+// ---------- Zespół ----------
+// Api.gs віддає [{ osoba, zmiana, proces, przerwa, udt, uwagi }]. Беремо лише ці поля:
+// навіть якщо в аркуші з'явиться інша колонка (телефон тощо), на сайт вона не потрапить.
 
 // Лише ім'я та ініціал: «Oleh Melnyk» → «Oleh M.»
 export function shortName(value) {
@@ -131,48 +166,20 @@ export function shortName(value) {
   return `${parts[0].slice(0, 30)} ${parts[1].charAt(0).toUpperCase()}.`;
 }
 
-function parseUdt(value) {
-  if (value === true) return true;
-  return ["true", "tak", "x", "1", "yes", "✓", "✔", "☑"].includes(String(value ?? "").trim().toLowerCase());
-}
-
-function toPerson(fields) {
-  const person = shortName(fields.person);
-  if (!person) return null;
-  return {
-    person,
-    shift: text(fields.shift, 10),
-    process: text(fields.process, 40),
-    break: text(fields.break, 30),
-    udt: parseUdt(fields.udt),
-    notes: text(fields.notes, 200),
-  };
-}
-
-// Приймає масив об'єктів або таблицю з рядком заголовків. Інші колонки відкидаються.
 export function normalizeTeam(value) {
   if (!Array.isArray(value)) return undefined;
-  const rows = value.slice(0, 500);
-  let people;
-  if (rows.length && Array.isArray(rows[0])) {
-    const header = rows[0].map(fieldFor);
-    people = rows.slice(1).map((row) => {
-      const fields = {};
-      header.forEach((field, i) => {
-        if (field && Array.isArray(row)) fields[field] = row[i];
-      });
-      return toPerson(fields);
-    });
-  } else {
-    people = rows.map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const fields = {};
-      for (const [key, val] of Object.entries(item)) {
-        const field = fieldFor(key);
-        if (field && !(field in fields)) fields[field] = val;
-      }
-      return toPerson(fields);
-    });
-  }
-  return people.filter(Boolean);
+  return value.slice(0, 500).flatMap((item) => {
+    const person = shortName(item?.osoba);
+    if (!person) return [];
+    return [
+      {
+        person,
+        shift: text(item.zmiana, 10),
+        process: text(item.proces, 40),
+        break: text(item.przerwa, 30),
+        udt: item.udt === true || String(item.udt).toLowerCase() === "true",
+        notes: text(item.uwagi, 200),
+      },
+    ];
+  });
 }

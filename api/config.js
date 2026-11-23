@@ -1,34 +1,25 @@
-// Налаштування для фронтенду після входу. Секрети сюди не потрапляють:
-// лише посилання і прапорці, що ввімкнено.
+// GET /api/config — налаштування для фронтенду. Секретів тут немає:
+// лише посилання на Google Таблицю (кнопка «Arkusz») і що ввімкнено.
 
+import { fail, json } from "../server/http.js";
 import { isAuthenticated } from "../server/session.js";
 import { readConfigured, writeConfigured } from "../server/sheetApi.js";
 
-function safeUrl(value, allowedHost) {
+function googleSheetUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && allowedHost(url.hostname) ? url.toString() : null;
+    return url.protocol === "https:" && url.hostname === "docs.google.com" ? url.toString() : null;
   } catch {
     return null;
   }
 }
 
-const sheetUrl = (value) => safeUrl(value, (host) => host === "docs.google.com");
-const excelUrl = (value) => safeUrl(value, (host) => host.endsWith(".sharepoint.com"));
-
 export async function GET(request) {
-  const headers = { "Cache-Control": "no-store" };
-  // Middleware уже перевіряє сесію; повторна перевірка на випадок помилки в matcher.
-  if (!(await isAuthenticated(request))) {
-    return Response.json({ error: "unauthorized" }, { status: 401, headers });
-  }
-  return Response.json(
-    {
-      sheetUrl: sheetUrl(process.env.SHEET_URL),
-      excelUrl: excelUrl(process.env.EXCEL_URL),
-      liveData: readConfigured(process.env),
-      canEditLinks: writeConfigured(process.env),
-    },
-    { headers },
-  );
+  // Middleware вже перевіряє сесію; тут — друга лінія захисту.
+  if (!(await isAuthenticated(request))) return fail("unauthorized", 401);
+  return json({
+    sheetUrl: googleSheetUrl(process.env.SHEET_URL),
+    liveData: readConfigured(process.env),
+    canEditLinks: writeConfigured(process.env),
+  });
 }

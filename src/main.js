@@ -1,79 +1,116 @@
-import "./style.css";
-import { LANGUAGES, escapeHtml, getLang, setLang, t } from "./i18n/index.js";
-import { files, mountScripts } from "./scripts/view.js";
-import { configReady } from "./config.js";
-import { mountTeam } from "./team/view.js";
-import { mountTrucks } from "./trucks/view.js";
+// Точка входу: шапка сайту, перемикач мови і маршрути між сторінками.
+//
+// Маршрути (hash): #/trucks (за замовчуванням), #/team, #/scripts, #/scripts/<файл>.
+// Старі посилання виду #StolPaletB3.txt теж працюють.
+// Код кожної сторінки завантажується лише тоді, коли її відкривають.
 
-// Маршрути: #/trucks, #/team, #/scripts, #/scripts/<файл>. Старі посилання #<файл> теж працюють.
+import "./styles/index.css";
+import { LANGUAGES, getLang, setLang, t } from "./i18n/index.js";
+import { configReady } from "./lib/config.js";
+import { html } from "./lib/html.js";
+import { icon, skeleton } from "./lib/ui.js";
+import { files } from "./pages/scripts/files.js";
+
+// load() повертає функцію mount(view, route) → unmount.
+const PAGES = [
+  {
+    id: "trucks",
+    labelKey: "nav.trucks",
+    load: () => import("./pages/trucks/view.js").then((m) => (view) => m.mountTrucks(view)),
+  },
+  {
+    id: "team",
+    labelKey: "nav.team",
+    load: () => import("./pages/team/view.js").then((m) => (view) => m.mountTeam(view)),
+  },
+  {
+    id: "scripts",
+    labelKey: "nav.scripts",
+    load: () => import("./pages/scripts/view.js").then((m) => (view, route) => m.mountScripts(view, route.file)),
+  },
+];
+
 function parseRoute() {
   const hash = decodeURIComponent(location.hash.slice(1));
-  if (hash.startsWith("/team")) return { page: "team" };
-  if (hash.startsWith("/scripts")) return { page: "scripts", file: hash.split("/")[2] || null };
   if (files.some((file) => file.name === hash)) return { page: "scripts", file: hash };
-  return { page: "trucks" };
+  const [, page, file = null] = hash.split("/");
+  return PAGES.some((p) => p.id === page) ? { page, file } : { page: "trucks", file: null };
 }
 
-let config = null; // відповідь /api/config
-let unmount = () => {};
+// ===================== Шапка =====================
 
-function renderShell() {
-  const route = parseRoute();
-  document.documentElement.lang = getLang();
-  document.title = t("app.title");
-  const navLink = (page, key) =>
-    `<a href="#/${page}"${route.page === page ? ' aria-current="page"' : ""}>${escapeHtml(t(key))}</a>`;
-  const langButton = ({ code, label }) =>
-    `<button type="button" data-lang="${code}" aria-pressed="${code === getLang()}">${label}</button>`;
+let config = null; // /api/config: посилання на таблицю; null — поки не завантажено або без входу
 
-  document.querySelector("#app").innerHTML = `
-    <header>
-      <a class="brand" href="#/trucks">H<span>Hermes</span></a>
-      <nav class="main-nav" aria-label="${escapeHtml(t("nav.label"))}">${navLink("trucks", "nav.trucks")}${navLink("team", "nav.team")}${navLink("scripts", "nav.scripts")}</nav>
+function header(route) {
+  return html`<header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#/trucks" aria-label="INB Hermes"><span class="brand-mark">INB</span><span class="brand-name">Hermes</span></a>
+      <nav class="main-nav" aria-label="${t("nav.label")}">
+        ${PAGES.map(
+          (page) => html`<a href="#/${page.id}" ${route.page === page.id ? html`aria-current="page"` : ""}>
+            ${icon(page.id)}<span>${t(page.labelKey)}</span>
+          </a>`,
+        )}
+      </nav>
       <div class="header-actions">
-        <div class="lang-switch" role="group" aria-label="${escapeHtml(t("header.language"))}">${LANGUAGES.map(langButton).join("")}</div>
-        <a id="sheet-link" class="header-button" target="_blank" rel="noopener noreferrer" hidden>${escapeHtml(t("header.sheet"))} ↗</a>
-        <form id="logout" method="post" action="/logout" hidden><button class="header-button" type="submit">${escapeHtml(t("header.logout"))}</button></form>
+        <div class="lang-switch" role="group" aria-label="${t("header.language")}">
+          ${LANGUAGES.map(
+            ({ code, label }) => html`<button type="button" data-lang="${code}" aria-pressed="${code === getLang()}">${label}</button>`,
+          )}
+        </div>
+        ${config?.sheetUrl &&
+        html`<a class="button" href="${config.sheetUrl}" target="_blank" rel="noopener noreferrer">
+          ${t("header.sheet")}${icon("external")}
+        </a>`}
+        ${config && html`<form method="post" action="/logout"><button class="button" type="submit">${t("header.logout")}</button></form>`}
       </div>
-    </header>
-    <main id="view"></main>
-    <footer>Hermes<span>Excel VBA · Google Sheets</span></footer>`;
-
-  document.querySelectorAll("[data-lang]").forEach((button) =>
-    button.addEventListener("click", () => {
-      setLang(button.dataset.lang);
-      renderShell();
-    }),
-  );
-  unmount();
-  const view = document.querySelector("#view");
-  const mounts = { scripts: () => mountScripts(view, route.file), team: () => mountTeam(view), trucks: () => mountTrucks(view) };
-  unmount = mounts[route.page]();
-  applyConfig();
+    </div>
+  </header>`;
 }
 
-// Посилання і кнопка виходу з'являються, коли сервер віддав налаштування (лише після входу).
-function applyConfig() {
-  if (!config) return;
-  document.querySelector("#logout").hidden = false;
-  const link = document.querySelector("#sheet-link");
-  if (config.sheetUrl) {
-    link.href = config.sheetUrl;
-    link.hidden = false;
-  }
-}
+// ===================== Рендер і маршрути =====================
 
-let lastPage = null;
-window.addEventListener("hashchange", () => {
+const app = document.querySelector("#app");
+let unmount = () => {};
+let currentPage = null;
+let renderId = 0; // щоб повільне завантаження старої сторінки не перекрило нову
+
+async function renderApp() {
+  const id = ++renderId;
   const route = parseRoute();
-  // Перемикання файлів у межах макросів не перезавантажує сторінку фур.
-  if (route.page !== lastPage || route.page === "scripts") renderShell();
-  lastPage = route.page;
+  const page = PAGES.find((p) => p.id === route.page);
+  document.documentElement.lang = getLang();
+  document.title = `${t(page.labelKey)} · Hermes`;
+  currentPage = route.page;
+
+  unmount();
+  unmount = () => {};
+  app.innerHTML = html`${header(route)}<main id="view" class="container">${skeleton(4)}</main>`;
+
+  const mount = await page.load();
+  if (id !== renderId) return;
+  unmount = mount(app.querySelector("#view"), route) || (() => {});
+}
+
+app.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-lang]");
+  if (!button) return;
+  setLang(button.dataset.lang);
+  renderApp();
 });
 
-lastPage = parseRoute().page;
-renderShell();
+window.addEventListener("hashchange", () => {
+  const route = parseRoute();
+  // Перемикання файлів макросів перемальовує сторінку; інші сторінки — лише при зміні.
+  if (route.page !== currentPage || route.page === "scripts") {
+    renderApp();
+    window.scrollTo({ top: 0 });
+  }
+});
+
+renderApp();
 configReady.then((value) => {
   config = value;
-  applyConfig();
+  // Показати «Arkusz» і «Wyloguj» — оновлюємо лише шапку, сторінка не перезавантажується.
+  if (config) app.querySelector(".site-header").outerHTML = header(parseRoute()).toString();
 });

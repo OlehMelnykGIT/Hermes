@@ -1,0 +1,8 @@
+/* Порядок важливий: токени → база → каркас → компоненти → сторінки. */
+@import "./tokens.css";
+@import "./base.css";
+@import "./layout.css";
+@import "./components.css";
+@import "./trucks.css";
+@import "./team.css";
+@import "./scripts.css";
