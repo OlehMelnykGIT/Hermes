@@ -65,7 +65,7 @@
   "trucks.day.closedAt": "zakończony {time}",
   "trucks.day.summary": "WAB: {total} · Stol: {done} · po terminie: {overdue}",
   "trucks.day.outsideTitle": "Wcześniejsze WAB",
-  "trucks.day.stats": "palety: {druk} · LU: {lu}",
+  "trucks.day.stats": "Replen: {druk} · Stol B3: {lu}",
   "trucks.day.outside": "Poza dniami",
   "trucks.stats.druk": "Replen",
   "trucks.stats.lu": "Stol B3",

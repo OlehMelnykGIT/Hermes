@@ -11,13 +11,18 @@
 
 const inDay = (item, day) => item.row >= day.fromRow && item.row <= day.toRow;
 
+// Залишки після очищення аркуша: закритий день, на рядки якого вже «зайшов» пізніший день
+// (таблицю почали з початку, а старий запис лишився в аркуші Dni). Рядки належать пізнішому дню.
+const isStale = (day, index, days) => days.slice(index + 1).some((later) => later.fromRow <= day.toRow);
+
 // WAB, розкладені по днях:
 //   current — поточний (відкритий) день або null;
 //   closed  — закриті дні, найновіші першими;
 //   outside — рядки, що не потрапили в жоден день.
 // Без days (старий Api.gs) — null: сторінка показує всі WAB, як раніше.
-export function groupByDays(items, days) {
-  if (!Array.isArray(days) || days.length === 0) return null;
+export function groupByDays(items, allDays) {
+  if (!Array.isArray(allDays) || allDays.length === 0) return null;
+  const days = allDays.filter((day, index) => !isStale(day, index, allDays));
   const last = days[days.length - 1];
   const currentDay = last.open ? last : null;
   const closedDays = days.filter((day) => day !== currentDay);

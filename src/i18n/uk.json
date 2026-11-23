@@ -65,7 +65,7 @@
   "trucks.day.closedAt": "закрито {time}",
   "trucks.day.summary": "WAB: {total} · Stol: {done} · прострочено: {overdue}",
   "trucks.day.outsideTitle": "Попередні WAB",
-  "trucks.day.stats": "палети: {druk} · LU: {lu}",
+  "trucks.day.stats": "Replen: {druk} · Stol B3: {lu}",
   "trucks.day.outside": "Поза днями",
   "trucks.stats.druk": "Replen",
   "trucks.stats.lu": "Stol B3",

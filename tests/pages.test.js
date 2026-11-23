@@ -339,13 +339,29 @@ describe("дні після очищення аркуша", () => {
   test("закритий день без WAB і без статистики не показується", () => {
     const days_ = [
       { id: "2026-11-23T08:28:43", nr: 1, fromRow: 2, toRow: 5, open: false, closedAt: "2026-11-23T09:56:30" },
-      { id: "2026-11-23T10:15:29", nr: 1, fromRow: 2, toRow: 1, open: true, closedAt: null },
+      { id: "2026-11-23T10:15:29", nr: 2, fromRow: 6, toRow: 5, open: true, closedAt: null },
     ];
-    const groups = days.groupByDays([], days_);
+    const groups = days.groupByDays([], days_); // рядки 2–5 уже порожні
     assert.equal(groups.closed.length, 1);
     assert.equal(days.visibleClosedDays(groups, []).length, 0);
     const stats = [{ dayId: "2026-11-23T08:28:43", day: "2026-11-23", druk: 5, lu: 2 }];
     assert.equal(days.visibleClosedDays(groups, stats).length, 1); // статистика є — день лишається
+  });
+});
+
+describe("старий запис дня після очищення аркуша", () => {
+  test("закритий день, на рядки якого зайшов пізніший день, відкидається", () => {
+    const live = [
+      { id: "2026-11-23 08:28:43", nr: 1, fromRow: 2, toRow: 5, open: false, closedAt: "2026-11-23T09:56:30" },
+      { id: "2026-11-23T10:15:29", nr: 1, fromRow: 2, toRow: 10, open: false, closedAt: "2026-11-23T12:48:21" },
+      { id: "2026-11-23T12:48:20", nr: 2, fromRow: 11, toRow: 19, open: true, closedAt: null },
+    ];
+    const items = trucks.normalizeTable([["Wab"], ...Array.from({ length: 18 }, (_, i) => [String(i + 1)])]);
+    const groups = days.groupByDays(items, live);
+    assert.deepEqual(groups.closed.map((g) => g.day.id), ["2026-11-23T10:15:29"]);
+    assert.equal(groups.closed[0].items.length, 9);
+    assert.equal(groups.current.items.length, 9);
+    assert.equal(groups.outside.length, 0);
   });
 });
 
