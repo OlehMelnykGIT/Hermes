@@ -108,6 +108,7 @@
   "status.desc.suspended": "Praca z WAB wstrzymana.",
   "status.desc.closed": "WAB rozładowany, przyjęty i Advice sprawdzony w systemie — zamknięty. Bramę można zwolnić pod nowy WAB.",
   "status.none": "Brak statusu",
+  "status.accepted": "Przyjęte",
 
   "team.title": "Zespół",
   "team.lead": "Kto jest na zmianie, w jakim procesie i kiedy ma przerwę.",
@@ -165,5 +166,28 @@
   "links.save": "Zapisz",
   "links.cancel": "Anuluj",
   "links.saving": "Zapisywanie…",
-  "links.saved": "Zapisano linki: {n}"
+  "links.saved": "Zapisano linki: {n}",
+
+  "ncg.lead": "Dostawy NCG z arkusza — tylko podgląd.",
+  "ncg.empty": "Brak dostaw NCG.",
+  "ncg.type.unloading": "Rozładunek",
+  "ncg.type.receipt": "Przyjęcie",
+  "ncg.notInLu": "Nie przekazano do LU",
+  "ncg.noExchange": "Bez wymiany palet",
+  "ncg.kpi.total": "Dostawy",
+  "ncg.kpi.pallets": "Palety",
+  "ncg.kpi.deliveries": "dostawy: {n}",
+  "ncg.kpi.empty": "Puste palety",
+  "ncg.kpi.exchanges": "wydane kierowcom · wymiany: {n}",
+  "ncg.kpi.notInLuHint": "dostawy jeszcze nie sprawdzone w LU",
+  "ncg.kpi.allInLu": "wszystkie dostawy są w LU",
+  "ncg.col.type": "Typ",
+  "ncg.col.place": "Brama / Bufor",
+  "ncg.col.date": "Data",
+  "ncg.col.status": "Status",
+  "ncg.col.pallets": "Palety",
+  "ncg.col.emptyPallets": "Puste palety",
+  "ncg.col.finalStatus": "Status końcowy",
+  "ncg.col.info": "Info",
+  "ncg.col.lu": "Do LU"
 }

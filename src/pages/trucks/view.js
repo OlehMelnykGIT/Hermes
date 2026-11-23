@@ -1,4 +1,4 @@
-// Сторінка «Fury / Bramy»: показники дня, фільтр статусів і таблиця FBO (та NCG, якщо API її віддає).
+// Сторінка «Rozładunek»: показники дня, фільтр статусів, таблиця FBO і блок NCG (ncgView.js).
 
 import { formatDuration, formatTime, t } from "../../i18n/index.js";
 import { barChart } from "../../lib/barChart.js";
@@ -40,13 +40,13 @@ import {
   recentStats,
   statsForDay,
 } from "./days.js";
+import { ncgSection } from "./ncgView.js";
 
 // Раз на 30 с оновлюємо лише відліки часу й «… temu» (без перемальовування сторінки);
 // дані таблиці й решта показників оновлюються щохвилини разом із запитом.
 const TICK_MS = 30_000;
 const ALL_STATUSES = [...STATUS_FLOW, ...EXTRA_STATUSES, "none"];
 const FBO_COLUMNS = ["wab", "gate", "deadline", "priority", "status", "buffer", "finalStatus", "info"];
-const NCG_COLUMNS = ["gate", "date", "status", "buffer", "finalStatus", "info"];
 
 // ===================== Дрібні елементи =====================
 
@@ -121,7 +121,6 @@ function cell(item, column, now) {
     case "wab":
       return html`<strong>${item.wab}</strong>`;
     case "deadline":
-    case "date":
       return html`<span class="date">${item.deadlineText}</span>${dueLabel(deadlineInfo(item, now), item.deadline)}`;
     case "status":
       return statusCell(item);
@@ -310,7 +309,6 @@ export function mountTrucks(container) {
     if (!sheet.data) return sheet.error ? "" : skeleton(6);
     const now = new Date();
     const fbo = normalizeTable(sheet.data.fbo, sheet.data.fboColors);
-    const ncg = sheet.data.ncg ? normalizeTable(sheet.data.ncg, sheet.data.ncgColors) : null;
 
     // Межі днів — лише з поля days. Без нього (старий Api.gs) показуємо всі WAB, як раніше.
     const groups = groupByDays(fbo, sheet.data.days);
@@ -336,7 +334,7 @@ export function mountTrucks(container) {
       </div>
       ${table(sortItems(visible, sort), FBO_COLUMNS, now, emptyText)}
       ${groups && closedDays(groups, sheet.data.stats, openDays, now)}
-      ${ncg && html`<div class="section-bar"><h2>${t("trucks.ncg")}</h2></div>${table(sortItems(ncg, sort), NCG_COLUMNS, now)}`}
+      ${ncgSection(sheet.data.ncg, sort)}
     </div>`;
   }
 

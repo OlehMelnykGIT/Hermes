@@ -36,7 +36,6 @@ function toBody(data) {
     euro: typeof data.euro === "string" ? data.euro : null,
     fboColors: table(data.fboColors),
     ncg: table(data.ncg),
-    ncgColors: table(data.ncgColors),
   };
 }
 

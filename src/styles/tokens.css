@@ -97,6 +97,7 @@
 .status--suspended  { --tone-fg: var(--orange-fg); --tone-bg: var(--orange-bg); }
 .status--no_advice  { --tone-fg: var(--red-fg);    --tone-bg: var(--red-bg); }
 .status--closed     { --tone-fg: var(--green-fg);  --tone-bg: var(--green-bg); }
+.status--accepted   { --tone-fg: var(--amber-fg);  --tone-bg: var(--amber-bg); }
 .status--none       { --tone-fg: var(--muted);     --tone-bg: var(--surface-2); }
 
 /* ---------- Тон за процесом (сторінка «Zespół») ---------- */
@@ -105,3 +106,7 @@
 .proc--replenishment { --tone-fg: var(--amber-fg);  --tone-bg: var(--amber-bg); }
 .proc--leader        { --tone-fg: var(--purple-fg); --tone-bg: var(--purple-bg); }
 .proc--other         { --tone-fg: var(--grey-fg);   --tone-bg: var(--grey-bg); }
+
+/* Typ dostawy NCG */
+.ncg-type--unloading { --tone-fg: var(--blue-fg);   --tone-bg: var(--blue-bg); }
+.ncg-type--receipt   { --tone-fg: var(--purple-fg); --tone-bg: var(--purple-bg); }

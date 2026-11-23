@@ -108,6 +108,7 @@
   "status.desc.suspended": "Роботу з WAB призупинено.",
   "status.desc.closed": "WAB розвантажено, прийнято й Advice перевірено в системі — закрито. Браму можна звільнити під новий WAB.",
   "status.none": "Без статусу",
+  "status.accepted": "Прийнято",
 
   "team.title": "Команда",
   "team.lead": "Хто на зміні, у якому процесі та коли має перерву.",
@@ -165,5 +166,28 @@
   "links.save": "Зберегти",
   "links.cancel": "Скасувати",
   "links.saving": "Збереження…",
-  "links.saved": "Збережено посилань: {n}"
+  "links.saved": "Збережено посилань: {n}",
+
+  "ncg.lead": "Доставки NCG з таблиці — лише перегляд.",
+  "ncg.empty": "Доставок NCG немає.",
+  "ncg.type.unloading": "Розвантаження",
+  "ncg.type.receipt": "Прийом",
+  "ncg.notInLu": "Не передано в LU",
+  "ncg.noExchange": "Без обміну палет",
+  "ncg.kpi.total": "Доставки",
+  "ncg.kpi.pallets": "Палети",
+  "ncg.kpi.deliveries": "доставок: {n}",
+  "ncg.kpi.empty": "Порожні палети",
+  "ncg.kpi.exchanges": "віддано водіям · обмінів: {n}",
+  "ncg.kpi.notInLuHint": "доставки ще не звірені в LU",
+  "ncg.kpi.allInLu": "усі доставки передано в LU",
+  "ncg.col.type": "Тип",
+  "ncg.col.place": "Брама / Буфер",
+  "ncg.col.date": "Дата",
+  "ncg.col.status": "Статус",
+  "ncg.col.pallets": "Палети",
+  "ncg.col.emptyPallets": "Порожні палети",
+  "ncg.col.finalStatus": "Фінальний статус",
+  "ncg.col.info": "Примітка",
+  "ncg.col.lu": "До LU"
 }

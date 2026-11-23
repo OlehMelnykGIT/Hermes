@@ -5,6 +5,7 @@ import { describe, test } from "node:test";
 import { html, raw } from "../src/lib/html.js";
 import * as team from "../src/pages/team/model.js";
 import * as days from "../src/pages/trucks/days.js";
+import * as ncg from "../src/pages/trucks/ncg.js";
 import * as trucks from "../src/pages/trucks/model.js";
 
 describe("html``", () => {
@@ -258,5 +259,52 @@ describe("Робочі дні і статистика", () => {
     assert.equal(days.formatShortDayTime("2026-11-24T06:02:00"), "24.11 06:02");
     assert.equal(days.formatSheetDateTime("2026-11-24T06:02:00"), "24.11.2026 06:02");
     assert.equal(days.formatShortDay("2026-11-24"), "24.11");
+  });
+});
+
+describe("NCG", () => {
+  // Колонки навмисно не в тому порядку, що в аркуші: шукаються за назвами.
+  const rows = [
+    ["Typ", "Brama", "Data ", "Status", "Palety", "Bufor", "Puste palety", "Final Status", "Info", "Do LU"],
+    ["Rozładunek", "120", "22.11.2026 12:00", "Plac, Rozładowano", "32", "Bufor Hera", "32", "Przyjęte", "N5", "FALSE"],
+    ["Przyjęcie", "", "23.11.2026 08:00", "", "18", "Bufor Zeus", "", "Stol", "", "TRUE"],
+    [" przyjęcie ", "", "23.11.2026 10:00", "", "20", "18", "0", "Cośtam", "", "true"],
+    ["Rozładunek", "121", "23.11.2026 14:00", "", "", "21", "", "Rozładowano", "", ""],
+    ["", "", "", "", "", "", "", "", "", ""],
+  ];
+  const { items, columns } = ncg.normalizeNcg(rows);
+
+  test("колонки за назвами, порожні рядки пропускаються", () => {
+    assert.equal(items.length, 4);
+    assert.equal(columns.has("lu"), true);
+    assert.deepEqual([items[0].gate, items[0].buffer, items[0].pallets], ["120", "Bufor Hera", 32]);
+    assert.equal(ncg.normalizeNcg([["Typ", "Palety"]]).columns.has("status"), false);
+  });
+
+  test("тип і статуси → ключі, невідомий статус лишається текстом", () => {
+    assert.deepEqual(items.map((i) => i.type), ["unloading", "receipt", "receipt", "unloading"]);
+    assert.equal(items[0].status.key, "unloaded"); // останній статус у клітинці
+    assert.equal(items[0].finalStatus.key, "accepted");
+    assert.equal(items[1].finalStatus.key, "stowed");
+    assert.deepEqual(items[2].finalStatus, { key: null, text: "Cośtam" });
+  });
+
+  test("Do LU: лише TRUE означає «передано»", () => {
+    assert.deepEqual(items.map((i) => i.passedToLu), [false, true, true, false]);
+  });
+
+  test("підсумки окремо для Rozładunek і Przyjęcie; порожні Puste palety — без обміну", () => {
+    const summary = ncg.summarizeNcg(items);
+    assert.equal(summary.deliveries, 4);
+    assert.deepEqual(summary.byType.unloading, { deliveries: 2, pallets: 32 });
+    assert.deepEqual(summary.byType.receipt, { deliveries: 2, pallets: 38 });
+    assert.equal(summary.emptyPallets, 32);
+    assert.equal(summary.exchanges, 2); // «32» і «0»
+    assert.equal(summary.notInLu, 2);
+  });
+
+  test("без поля ncg або з порожнім аркушем — нічого не ламається", () => {
+    assert.deepEqual(ncg.normalizeNcg(undefined).items, []);
+    assert.deepEqual(ncg.normalizeNcg([]).items, []);
   });
 });

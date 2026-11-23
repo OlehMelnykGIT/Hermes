@@ -319,3 +319,63 @@
         text-align: right;
     }
 }
+
+/* ---------- NCG ---------- */
+
+/* Кольорова крапка типу доставки в підписі картки */
+.dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--tone-fg);
+}
+
+/* Bufor під брамою (Rozładunek) */
+.ncg-sub {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.col-pallets,
+.col-emptyPallets {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Доставка ще не передана в LU */
+.badge.ncg-nolu {
+    --tone-fg: var(--red-fg);
+    --tone-bg: var(--red-bg);
+    white-space: nowrap;
+}
+
+.ncg-table .badge {
+    gap: 4px;
+}
+
+.ncg-table .badge .icon {
+    width: 13px;
+    height: 13px;
+}
+
+.data-table tr.row--nolu td:first-child {
+    box-shadow: inset 3px 0 0 var(--red-fg);
+}
+
+@media (max-width: 760px) {
+    .data-table tr.row--nolu {
+        border-color: color-mix(in srgb, var(--red-fg) 40%, var(--line));
+    }
+
+    .ncg-table td > .badge,
+    .ncg-place {
+        margin-left: auto;
+        text-align: right;
+    }
+}
+
+.kpis + .table-wrap {
+    margin-top: 14px;
+}
