@@ -1,6 +1,6 @@
 // Точка входу: шапка сайту, перемикач мови і маршрути між сторінками.
 //
-// Маршрути (hash): #/trucks (за замовчуванням), #/team, #/scripts, #/scripts/<файл>.
+// Маршрути (hash): #/trucks (за замовчуванням), #/team, #/notes, #/scripts, #/scripts/<файл>.
 // Старі посилання виду #StolPaletB3.txt теж працюють.
 // Код кожної сторінки завантажується лише тоді, коли її відкривають.
 
@@ -23,6 +23,11 @@ const PAGES = [
     id: "team",
     labelKey: "nav.team",
     load: () => import("./pages/team/view.js").then((m) => (view) => m.mountTeam(view)),
+  },
+  {
+    id: "notes",
+    labelKey: "nav.notes",
+    load: () => import("./pages/notes/view.js").then((m) => (view) => m.mountNotes(view)),
   },
   {
     id: "scripts",

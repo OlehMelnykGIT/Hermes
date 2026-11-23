@@ -47,15 +47,19 @@ export function getSheet(env) {
   return call(url);
 }
 
-export function saveLinks(env, links) {
+// Запис в Apps Script: POST з токеном запису в тілі (не в адресі).
+function postAction(env, action, payload) {
   const url = baseUrl(env);
   if (!url || !env.SHEET_API_WRITE_TOKEN) return Promise.resolve({ error: "not_configured" });
   return call(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token: env.SHEET_API_WRITE_TOKEN, action: "saveLinks", links }),
+    body: JSON.stringify({ token: env.SHEET_API_WRITE_TOKEN, action, ...payload }),
   });
 }
+
+export const saveLinks = (env, links) => postAction(env, "saveLinks", { links });
+export const saveNotes = (env, notes) => postAction(env, "saveNotes", { notes });
 
 export function errorStatus(error) {
   return error === "not_configured" ? 503 : 502;
@@ -183,3 +187,90 @@ export function normalizeTeam(value) {
     ];
   });
 }
+
+// ---------- Notatki ----------
+// Api.gs віддає [{ id, title, text, color, pinned, created, updated }].
+// Запис (saveNotes) замінює весь список; нова нотатка має порожній id — Api.gs видасть свій.
+
+export const NOTE_COLORS = ["yellow", "green", "blue", "pink", "gray"];
+export const MAX_NOTES = 300;
+export const MAX_NOTE_TITLE = 120;
+export const MAX_NOTE_TEXT = 10000;
+const MAX_NOTE_ID = 64;
+
+const noteColor = (value) => (NOTE_COLORS.includes(value) ? value : "yellow");
+const isTrue = (value) => value === true || String(value).toLowerCase() === "true";
+const noteDate = (value) => {
+  const raw = text(value, 40);
+  return raw && !Number.isNaN(Date.parse(raw)) ? raw : null;
+};
+const time = (value) => (value ? Date.parse(value) : 0);
+
+// Закріплені першими, далі найсвіжіші (за updated, інакше created).
+export function sortNotes(notes) {
+  return [...notes].sort(
+    (a, b) => Number(b.pinned) - Number(a.pinned) || time(b.updated || b.created) - time(a.updated || a.created),
+  );
+}
+
+export function normalizeNotes(value) {
+  if (!Array.isArray(value)) return undefined;
+  const notes = value.slice(0, MAX_NOTES).flatMap((item) => {
+    const id = text(item?.id, MAX_NOTE_ID);
+    const title = text(item?.title, MAX_NOTE_TITLE);
+    const body = String(item?.text ?? "").slice(0, MAX_NOTE_TEXT);
+    if (!id || (!title && !body.trim())) return [];
+    return [
+      {
+        id,
+        title,
+        text: body,
+        color: noteColor(item.color),
+        pinned: isTrue(item.pinned),
+        created: noteDate(item.created),
+        updated: noteDate(item.updated),
+      },
+    ];
+  });
+  return sortNotes(notes);
+}
+
+// Одна нотатка з форми. Повертає { note } або { error }.
+export function validateNote(value) {
+  if (!value || typeof value !== "object") return { error: "invalid_note" };
+  const id = typeof value.id === "string" ? value.id.trim() : "";
+  const title = typeof value.title === "string" ? value.title.trim() : "";
+  const body = typeof value.text === "string" ? value.text.replace(/\s+$/, "") : "";
+  if (id.length > MAX_NOTE_ID || !NOTE_COLORS.includes(value.color) || typeof value.pinned !== "boolean") {
+    return { error: "invalid_note" };
+  }
+  if (title.length > MAX_NOTE_TITLE || body.length > MAX_NOTE_TEXT) return { error: "note_too_long" };
+  if (!title && !body.trim()) return { error: "note_empty" };
+  return { note: { id, title, text: body, color: value.color, pinned: value.pinned } };
+}
+
+// Застосувати одну зміну до свіжого списку з таблиці (щоб не затерти чужі зміни).
+//   { op: "save", note }  — замінити нотатку з тим id або додати нову (порожній id);
+//   { op: "delete", id }  — видалити.
+// Повертає { notes } (у форматі для saveNotes) або { error }.
+export function applyNoteChange(current, change) {
+  const list = (current || []).map(({ id, title, text: body, color, pinned }) => ({ id, title, text: body, color, pinned }));
+  if (change?.op === "delete") {
+    const id = typeof change.id === "string" ? change.id.trim() : "";
+    if (!id) return { error: "invalid_note" };
+    if (!list.some((note) => note.id === id)) return { error: "note_not_found" };
+    return { notes: list.filter((note) => note.id !== id) };
+  }
+  if (change?.op !== "save") return { error: "invalid_note" };
+  const { note, error } = validateNote(change.note);
+  if (error) return { error };
+  if (!note.id) {
+    if (list.length >= MAX_NOTES) return { error: "too_many_notes" };
+    return { notes: [...list, note] };
+  }
+  const index = list.findIndex((item) => item.id === note.id);
+  if (index < 0) return { error: "note_not_found" }; // нотатку вже хтось видалив
+  list[index] = note;
+  return { notes: list };
+}
+

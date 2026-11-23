@@ -19,6 +19,12 @@ const KNOWN_ERRORS = new Set([
   "network",
   "invalid_links",
   "too_many_links",
+  "invalid_note",
+  "note_too_long",
+  "note_empty",
+  "too_many_notes",
+  "note_not_found",
+  "notes_unavailable",
 ]);
 
 export function errorMessage(error) {

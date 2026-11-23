@@ -8,13 +8,14 @@
 | --- | --- |
 | **Rozładunek** | Аркуш Rozładunek: прогрес дня, дедлайни, Replen / Stol B3, закриті дні; блок NCG за датами |
 | **Zespół** | Аркуш Zespół: хто в якому процесі, розподіл перерв, UDT / VNA |
+| **Notatki** | Спільні нотатки з таблиці: кольорові картки, пошук, закріплення, редагування у вікні |
 | **Makra VBA** | Код макросів (перегляд, копіювання, завантаження) і посилання з аркуша Linki |
 
 ## Структура
 
 ```text
 middleware.js         пароль на весь сайт (/login, /logout, перевірка сесії)
-api/                  серверні функції Vercel: config, sheet (читання), links (запис)
+api/                  серверні функції Vercel: config, sheet (читання), links і notes (запис)
 server/               спільний серверний код: сесія, запити до Apps Script, сторінка входу
 src/
   main.js             шапка, мова, маршрути (#/trucks, #/team, #/scripts)
@@ -53,7 +54,7 @@ npm run build                # збірка в dist/
 | `SHEET_URL` | посилання на Google Таблицю (посилання «Replenishment SLA» у шапці) |
 | `SHEET_API_URL` | адреса Apps Script Web App (закінчується на `/exec`) |
 | `SHEET_API_TOKEN` | токен читання (`API_TOKEN` в Apps Script) |
-| `SHEET_API_WRITE_TOKEN` | токен запису аркуша Linki (`API_WRITE_TOKEN` в Apps Script) |
+| `SHEET_API_WRITE_TOKEN` | токен запису Linki і Notatki (`API_WRITE_TOKEN` в Apps Script) |
 
 Після зміни змінних — **Deployments → Redeploy**. Зміна `SITE_PASSWORD` або `SESSION_SECRET`
 розлогінює всіх; сесія живе 12 годин. Без пароля й секрету сайт нікого не пускає.

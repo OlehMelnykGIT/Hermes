@@ -6,6 +6,7 @@ import { html, raw } from "../src/lib/html.js";
 import * as team from "../src/pages/team/model.js";
 import * as days from "../src/pages/trucks/days.js";
 import * as ncg from "../src/pages/trucks/ncg.js";
+import * as notes from "../src/pages/notes/model.js";
 import * as trucks from "../src/pages/trucks/model.js";
 
 describe("html``", () => {
@@ -368,6 +369,31 @@ describe("старий запис дня після очищення аркуш�
     assert.equal(groups.closed[0].items.length, 9);
     assert.equal(groups.current.items.length, 9);
     assert.equal(groups.outside.length, 0);
+  });
+});
+
+describe("Notatki", () => {
+  const list = [
+    { id: "1", title: "Zmiana nocna", text: "Brama 115 — awaria", pinned: false, updated: "2026-11-23T10:00:00" },
+    { id: "2", title: "Klucze", text: "u lidera", pinned: true, updated: "2026-11-20T10:00:00" },
+    { id: "3", title: "", text: "Łańcuch na bramie", pinned: false, updated: "2026-11-23T12:00:00" },
+  ];
+
+  test("закріплені першими, далі найсвіжіші", () => {
+    assert.deepEqual(notes.sortNotes(list).map((n) => n.id), ["2", "3", "1"]);
+  });
+
+  test("пошук у заголовку й тексті, без різниці регістру й діакритиків, усі слова", () => {
+    assert.deepEqual(notes.filterNotes(list, "BRAM").map((n) => n.id), ["1", "3"]);
+    assert.deepEqual(notes.filterNotes(list, "lancuch").map((n) => n.id), ["3"]);
+    assert.deepEqual(notes.filterNotes(list, "brama awaria").map((n) => n.id), ["1"]);
+    assert.equal(notes.filterNotes(list, "  ").length, 3);
+  });
+
+  test("дата «zmieniono» і порожня нотатка", () => {
+    assert.equal(notes.formatNoteDate("2026-11-23T14:05:00"), "23.11.2026 14:05");
+    assert.equal(notes.formatNoteDate(null), "");
+    assert.equal(notes.isEmptyNote({ title: " ", text: "\n" }), true);
   });
 });
 

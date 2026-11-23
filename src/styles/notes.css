@@ -1,0 +1,405 @@
+/* =====================================================================
+   Сторінка «Notatki»: кольорові картки, пошук, вікно редагування.
+   ===================================================================== */
+
+/* Кольори нотаток: фон картки, рамка і кольорова точка вибору */
+.note--yellow { --note-bg: #fff6cc; --note-line: #ecd97a; --note-dot: #e9c23c; }
+.note--green  { --note-bg: #e1f4e6; --note-line: #a9d9b6; --note-dot: #3fa463; }
+.note--blue   { --note-bg: #e3eefc; --note-line: #a9c6ee; --note-dot: #3d7fd6; }
+.note--pink   { --note-bg: #fce6ee; --note-line: #efb1c6; --note-dot: #d9527f; }
+.note--gray   { --note-bg: #eef0f1; --note-line: #c9cfd3; --note-dot: #7d8a93; }
+
+@media (prefers-color-scheme: dark) {
+    .note--yellow { --note-bg: #352f15; --note-line: #5c5124; --note-dot: #e9c23c; }
+    .note--green  { --note-bg: #17301f; --note-line: #2b5238; --note-dot: #5cc282; }
+    .note--blue   { --note-bg: #172941; --note-line: #2b4a72; --note-dot: #6aa2ee; }
+    .note--pink   { --note-bg: #361b26; --note-line: #613043; --note-dot: #ea7fa3; }
+    .note--gray   { --note-bg: #242b2f; --note-line: #3a454c; --note-dot: #9aa7b0; }
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+/* ---------- Пошук ---------- */
+
+.notes-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    margin-bottom: 18px;
+}
+
+.notes-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    max-width: 460px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--muted);
+}
+
+.notes-search:focus-within {
+    border-color: var(--accent);
+}
+
+.notes-search input {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+}
+
+/* ---------- Сітка карток ---------- */
+
+.notes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    align-items: start;
+    gap: 14px;
+}
+
+.note-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 120px;
+    padding: 14px 14px 12px 16px;
+    border: 1px solid var(--note-line);
+    border-radius: var(--radius);
+    background: var(--note-bg);
+    box-shadow: var(--shadow);
+    transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.note-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-1px);
+}
+
+/* Уся картка клікабельна; шпилька — поверх неї */
+.note-open {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    cursor: pointer;
+}
+
+.note-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.note-head h3 {
+    flex: 1;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.note-text {
+    display: -webkit-box;
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    -webkit-line-clamp: 8;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.note-foot {
+    margin-top: auto;
+    padding-top: 6px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+/* Шпилька: порожня — ледь помітна, закріплена — кольорова й нахилена */
+.note-pin {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 30px;
+    height: 30px;
+    margin: -4px -4px 0 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    opacity: 0.55;
+    cursor: pointer;
+    transition: opacity 0.15s, background-color 0.15s, color 0.15s;
+}
+
+.note-pin .icon {
+    width: 18px;
+    height: 18px;
+}
+
+.note-card:hover .note-pin,
+.note-pin:focus-visible {
+    opacity: 1;
+}
+
+.note-pin:hover {
+    background: color-mix(in srgb, var(--note-dot) 18%, transparent);
+}
+
+.note-pin[aria-pressed="true"],
+.note-pin--static {
+    opacity: 1;
+    color: var(--note-dot);
+}
+
+.note-pin[aria-pressed="true"] .icon,
+.note-pin--static .icon {
+    transform: rotate(35deg);
+    fill: currentColor;
+}
+
+.note-pin--static {
+    cursor: default;
+}
+
+/* ---------- Вікно редагування ---------- */
+
+.note-dialog {
+    width: min(760px, 100% - 32px);
+    max-height: calc(100vh - 48px);
+    padding: 0;
+    border: 0;
+    border-radius: 18px;
+    background: transparent;
+    color: var(--text);
+}
+
+.note-dialog::backdrop {
+    background: rgb(10 18 15 / 45%);
+    backdrop-filter: blur(3px);
+}
+
+.note-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 20px 20px;
+    border: 1px solid var(--note-line);
+    border-radius: 18px;
+    background: var(--note-bg);
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.note-form-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.note-title-input {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 0;
+    border: 0;
+    border-bottom: 1px solid var(--note-line);
+    outline: 0;
+    background: transparent;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.note-title-input:focus {
+    border-bottom-color: var(--note-dot);
+}
+
+.note-form .note-pin {
+    margin: 0;
+    opacity: 1;
+}
+
+.icon-button {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.icon-button:hover {
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text);
+}
+
+.note-text-input {
+    min-height: min(55vh, 520px);
+    padding: 12px 14px;
+    border: 1px solid var(--note-line);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+    font: inherit;
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--text);
+    resize: vertical;
+}
+
+.note-text-input:focus {
+    outline: 2px solid color-mix(in srgb, var(--note-dot) 60%, transparent);
+    outline-offset: 0;
+}
+
+.note-form-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.note-form .message {
+    margin: 0;
+}
+
+.note-form-actions,
+.note-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.note-confirm {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: var(--red-bg);
+    color: var(--red-fg);
+    font-weight: 600;
+}
+
+.note-confirm > span:first-child {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Вибір кольору — кольорові кружечки */
+.note-colors {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.swatch {
+    position: relative;
+    width: 26px;
+    height: 26px;
+    border: 2px solid var(--surface);
+    border-radius: 50%;
+    background: var(--note-dot);
+    box-shadow: 0 0 0 1px var(--line);
+    cursor: pointer;
+}
+
+.swatch input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.swatch:has(input:checked) {
+    box-shadow: 0 0 0 2px var(--text);
+}
+
+.swatch:has(input:focus-visible) {
+    outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    outline-offset: 2px;
+}
+
+.button--danger {
+    background: var(--red-fg);
+    border-color: var(--red-fg);
+    color: var(--surface);
+}
+
+.button--danger:hover {
+    color: var(--surface);
+    border-color: var(--red-fg);
+    filter: brightness(1.1);
+}
+
+.button--danger-ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--red-fg);
+}
+
+.button--danger-ghost:hover {
+    border-color: var(--red-fg);
+    color: var(--red-fg);
+}
+
+/* ---------- Телефон ---------- */
+
+@media (max-width: 760px) {
+    .notes-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .notes-search {
+        max-width: none;
+    }
+
+    .note-dialog {
+        width: 100%;
+        max-width: none;
+        max-height: 100vh;
+        margin: auto 0 0;
+        border-radius: 18px 18px 0 0;
+    }
+
+    .note-form {
+        border-radius: 18px 18px 0 0;
+        padding: 14px 16px 18px;
+    }
+
+    .note-text-input {
+        min-height: 45vh;
+    }
+
+    .note-form-actions .spacer {
+        flex-basis: 100%;
+    }
+
+    .note-form-actions .button {
+        flex: 1;
+    }
+}

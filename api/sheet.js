@@ -1,4 +1,4 @@
-// GET /api/sheet — дані таблиці для всіх сторінок (FBO, дні, статистика, Zespół, Linki).
+// GET /api/sheet — дані таблиці для всіх сторінок (FBO, дні, статистика, Zespół, Linki, Notatki).
 // Токен читання лишається на сервері; у браузер ідуть лише перевірені поля.
 //
 // Короткий кеш у пам'яті сервера: Apps Script відповідає 3–4 с, а сторінку одночасно
@@ -14,6 +14,7 @@ import {
   getSheet,
   normalizeDays,
   normalizeLinks,
+  normalizeNotes,
   normalizeStats,
   normalizeTeam,
   table,
@@ -32,6 +33,7 @@ function toBody(data) {
     links: normalizeLinks(data.links),
     days: normalizeDays(data.days),
     stats: normalizeStats(data.stats),
+    notes: normalizeNotes(data.notes),
     // Необов'язкові поля: з'являться на сайті, щойно Api.gs почне їх віддавати.
     euro: typeof data.euro === "string" ? data.euro : null,
     fboColors: table(data.fboColors),

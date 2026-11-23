@@ -4,10 +4,13 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, test } from "node:test";
 import { POST as saveLinksRoute } from "../api/links.js";
+import { POST as saveNoteRoute } from "../api/notes.js";
 import { resetCache, GET as sheetRoute } from "../api/sheet.js";
 import { createSession } from "../server/session.js";
 import {
+  applyNoteChange,
   normalizeDays,
+  normalizeNotes,
   normalizeLinks,
   normalizeStats,
   normalizeTeam,
@@ -204,3 +207,111 @@ describe("POST /api/links", () => {
     assert.equal((await save({ links: [] })).status, 503);
   });
 });
+
+describe("Notatki: перевірка даних", () => {
+  const note = (extra = {}) => ({ id: "n1", title: "A", text: "x", color: "blue", pinned: false, ...extra });
+
+  test("з таблиці: закріплені першими, далі найсвіжіші; порожні й без id відкидаються; чужий колір → жовтий", () => {
+    const notes = normalizeNotes([
+      { id: "old", title: "Old", text: "", color: "blue", pinned: false, updated: "2026-11-20T10:00:00" },
+      { id: "new", title: "New", text: "", color: "red", pinned: "FALSE", updated: "2026-11-23T10:00:00" },
+      { id: "pin", title: "", text: "Pinned", color: "pink", pinned: true, updated: "2026-11-01T10:00:00" },
+      { id: "", title: "No id", text: "" },
+      { id: "empty", title: " ", text: "  " },
+    ]);
+    assert.deepEqual(notes.map((n) => n.id), ["pin", "new", "old"]);
+    assert.equal(notes[1].color, "yellow");
+    assert.equal(notes[1].pinned, false);
+    assert.equal(normalizeNotes(undefined), undefined);
+  });
+
+  test("зміна застосовується до свіжого списку і не чіпає інші нотатки", () => {
+    const current = [note(), note({ id: "n2", title: "B" })];
+    const edited = applyNoteChange(current, { op: "save", note: note({ title: "A2" }) }).notes;
+    assert.deepEqual(edited.map((n) => n.title), ["A2", "B"]);
+    const added = applyNoteChange(current, { op: "save", note: note({ id: "", title: "C" }) }).notes;
+    assert.equal(added.length, 3);
+    assert.equal(added[2].id, "");
+    assert.deepEqual(applyNoteChange(current, { op: "delete", id: "n1" }).notes.map((n) => n.id), ["n2"]);
+  });
+
+  test("ліміти й помилки", () => {
+    assert.equal(applyNoteChange([], { op: "save", note: note({ id: "", title: "x".repeat(121) }) }).error, "note_too_long");
+    assert.equal(applyNoteChange([], { op: "save", note: note({ id: "", text: "x".repeat(10001) }) }).error, "note_too_long");
+    assert.equal(applyNoteChange([], { op: "save", note: note({ id: "", title: "", text: "  " }) }).error, "note_empty");
+    assert.equal(applyNoteChange([], { op: "save", note: note({ color: "red" }) }).error, "invalid_note");
+    assert.equal(applyNoteChange([], { op: "save", note: note() }).error, "note_not_found");
+    assert.equal(applyNoteChange([], { op: "delete", id: "n1" }).error, "note_not_found");
+    assert.equal(applyNoteChange([], { op: "drop" }).error, "invalid_note");
+    const full = Array.from({ length: 300 }, (_, i) => note({ id: `n${i}` }));
+    assert.equal(applyNoteChange(full, { op: "save", note: note({ id: "" }) }).error, "too_many_notes");
+  });
+});
+
+describe("POST /api/notes", () => {
+  let calls;
+  const sheetNotes = [
+    { id: "n1", title: "Mine", text: "a", color: "yellow", pinned: false, created: "2026-11-23T08:00:00", updated: "2026-11-23T08:00:00" },
+    { id: "n2", title: "Someone else's", text: "b", color: "green", pinned: true, created: "2026-11-23T09:00:00", updated: "2026-11-23T09:00:00" },
+  ];
+
+  // GET → список з таблиці, POST → Api.gs повертає збережений список з виданими id.
+  function mockSheet() {
+    calls = [];
+    globalThis.fetch = async (url, init = {}) => {
+      calls.push({ url: String(url), ...init });
+      if ((init.method || "GET") === "GET") return new Response(JSON.stringify({ notes: sheetNotes }));
+      const body = JSON.parse(init.body);
+      const notes = body.notes.map((n, i) => ({ ...n, id: n.id || `new-${i}`, updated: "2026-11-23T12:00:00" }));
+      return new Response(JSON.stringify({ ok: true, count: notes.length, notes }));
+    };
+  }
+
+  const save = (body, headers = {}) =>
+    saveNoteRoute(
+      new Request(`${SITE}/api/notes`, {
+        method: "POST",
+        body: JSON.stringify(body),
+        headers: { origin: SITE, cookie, "content-type": "application/json", ...headers },
+      }),
+    );
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  test("нова нотатка додається до свіжого списку; токен запису в тілі, не в адресі", async () => {
+    mockSheet();
+    const response = await save({ op: "save", note: { id: "", title: "Nowa", text: "t", color: "pink", pinned: false } });
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    const post = calls.find((c) => c.method === "POST");
+    const sent = JSON.parse(post.body);
+    assert.equal(sent.action, "saveNotes");
+    assert.equal(sent.token, "WRITE-TOKEN");
+    assert.doesNotMatch(post.url, /WRITE-TOKEN/);
+    assert.deepEqual(sent.notes.map((n) => n.title), ["Someone else's", "Mine", "Nowa"]); // чужі нотатки збережено
+    assert.equal(result.count, 3);
+    assert.ok(result.notes.some((n) => n.id === "new-2" && n.title === "Nowa"));
+    assert.equal(result.notes[0].pinned, true); // закріплена першою
+  });
+
+  test("видалення і нотатка, яку вже видалив хтось інший", async () => {
+    mockSheet();
+    const removed = await (await save({ op: "delete", id: "n1" })).json();
+    assert.deepEqual(removed.notes.map((n) => n.id), ["n2"]);
+    mockSheet();
+    assert.equal((await save({ op: "delete", id: "gone" })).status, 409);
+  });
+
+  test("захист і перевірка до звернення в таблицю", async () => {
+    mockSheet();
+    const valid = { op: "save", note: { id: "", title: "A", text: "", color: "blue", pinned: false } };
+    assert.equal((await save(valid, { origin: "https://evil.example" })).status, 403);
+    assert.equal((await save(valid, { cookie: "" })).status, 401);
+    assert.equal((await save(valid, { "content-type": "text/plain" })).status, 415);
+    assert.equal((await save({ op: "save", note: { ...valid.note, title: "", text: "" } })).status, 400);
+    assert.equal(calls.length, 0); // погані запити не дійшли до Google
+  });
+});
+

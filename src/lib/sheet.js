@@ -32,6 +32,12 @@ export async function refresh({ fresh = false } = {}) {
   }
 }
 
+// Після збереження нотатки: одразу показати список, який повернув сервер,
+// не чекаючи наступного оновлення таблиці.
+export function setNotes(notes) {
+  if (state.data) setState({ data: { ...state.data, notes } });
+}
+
 const isVisible = () => document.visibilityState === "visible";
 
 function onVisibilityChange() {

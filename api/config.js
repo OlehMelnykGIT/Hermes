@@ -21,5 +21,6 @@ export async function GET(request) {
     sheetUrl: googleSheetUrl(process.env.SHEET_URL),
     liveData: readConfigured(process.env),
     canEditLinks: writeConfigured(process.env),
+    canEditNotes: writeConfigured(process.env),
   });
 }

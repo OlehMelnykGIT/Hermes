@@ -9,7 +9,7 @@ const SERVER_ENV = [
   "SHEET_API_TOKEN",
   "SHEET_API_WRITE_TOKEN",
 ];
-const API_ROUTES = { "/api/config": "/api/config.js", "/api/sheet": "/api/sheet.js", "/api/links": "/api/links.js" };
+const API_ROUTES = { "/api/config": "/api/config.js", "/api/sheet": "/api/sheet.js", "/api/links": "/api/links.js", "/api/notes": "/api/notes.js" };
 
 async function readBody(req) {
   const chunks = [];
