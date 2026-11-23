@@ -1,4 +1,4 @@
-// Блок «Linki»: посилання лише з аркуша Linki і їх редагування.
+// Розділ «Linki» (вкладка «Notatki i makra»): посилання лише з аркуша Linki і їх редагування.
 // Запис іде через /api/links (токен для запису є тільки на сервері).
 
 import { t } from "../../i18n/index.js";
@@ -6,7 +6,8 @@ import { api, errorMessage, isSilentError } from "../../lib/api.js";
 import { configReady } from "../../lib/config.js";
 import { html } from "../../lib/html.js";
 import { refresh, subscribe } from "../../lib/sheet.js";
-import { emptyState, errorBox, icon, skeleton } from "../../lib/ui.js";
+import { emptyState, errorBox, icon, liveBadge, pageHead, skeleton } from "../../lib/ui.js";
+import { workspaceTabs } from "../workspaceTabs.js";
 
 const MAX_LINKS = 50;
 
@@ -81,13 +82,15 @@ export function mountLinks(container) {
   function render() {
     const canEdit = config?.canEditLinks && links() !== null && !editing;
     container.innerHTML = html`
-      <div class="section-bar">
-        <div>
-          <h2>${t("links.title")}</h2>
-          <p class="muted small">${t("links.lead")}</p>
-        </div>
-        ${canEdit && html`<button type="button" class="button" data-edit>${icon("edit")}${t("links.edit")}</button>`}
-      </div>
+      ${workspaceTabs("links")}
+      ${pageHead({
+        title: t("links.title"),
+        lead: t("links.lead"),
+        iconName: "link",
+        actions: html`${liveBadge(sheet)}${
+          canEdit && html`<button type="button" class="button button--primary" data-edit>${icon("edit")}${t("links.edit")}</button>`
+        }`,
+      })}
       ${notice && html`<p class="message ${notice.isError ? "message--error" : "message--ok"}" role="status">${notice.text}</p>`}
       ${!editing && errorBox(sheet.error)}
       ${body()}`;
@@ -134,7 +137,7 @@ export function mountLinks(container) {
   // Повідомлення в режимі редагування — без повного перемальовування, щоб не втратити введене.
   function showNotice() {
     container.querySelector(".message")?.remove();
-    container.querySelector(".section-bar").insertAdjacentHTML(
+    container.querySelector(".page-head").insertAdjacentHTML(
       "afterend",
       html`<p class="message ${notice.isError ? "message--error" : ""}" role="status">${notice.text}</p>`.toString(),
     );

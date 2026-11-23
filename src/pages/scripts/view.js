@@ -1,11 +1,11 @@
-// Сторінка «Makra VBA»: файли макросів (перегляд, копіювання, завантаження) і посилання з таблиці.
+// Розділ «Makra VBA»: файли макросів (перегляд, копіювання, завантаження).
 // Код файлу завантажується лише при відкритті й запам'ятовується до перезавантаження сторінки.
 
 import { t } from "../../i18n/index.js";
 import { html } from "../../lib/html.js";
 import { emptyState, icon, pageHead, skeleton } from "../../lib/ui.js";
+import { workspaceTabs } from "../workspaceTabs.js";
 import { files } from "./files.js";
-import { mountLinks } from "./links.js";
 
 const loaded = new Map(); // назва файлу → текст
 
@@ -51,10 +51,11 @@ export function mountScripts(container, selectedName) {
   let alive = true;
 
   container.innerHTML = html`
+    ${workspaceTabs("scripts")}
     ${pageHead({ title: t("scripts.title"), lead: t("scripts.lead"), iconName: "scripts" })}
     <nav class="card-grid card-grid--wide" aria-label="${t("scripts.navLabel")}">${files.map((file) => fileCard(file, selected))}</nav>
     <div data-viewer>${selected ? viewer(selected, loaded.get(selected.name) ?? null) : emptyState(t("scripts.empty"), "scripts")}</div>
-    <section class="links" data-links></section>`;
+`;
 
   if (selected && !loaded.has(selected.name)) {
     selected
@@ -80,11 +81,9 @@ export function mountScripts(container, selectedName) {
   }
 
   container.addEventListener("click", onClick);
-  const unmountLinks = mountLinks(container.querySelector("[data-links]"));
 
   return () => {
     alive = false;
-    unmountLinks();
     container.removeEventListener("click", onClick);
   };
 }

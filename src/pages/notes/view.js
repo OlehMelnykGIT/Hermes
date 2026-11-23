@@ -14,6 +14,7 @@ import { configReady } from "../../lib/config.js";
 import { html } from "../../lib/html.js";
 import { refresh, setNotes, subscribe } from "../../lib/sheet.js";
 import { emptyState, errorBox, icon, liveBadge, pageHead, skeleton, updateTimeAgo } from "../../lib/ui.js";
+import { workspaceTabs } from "../workspaceTabs.js";
 import { MAX_NOTES, MAX_TEXT, MAX_TITLE, NOTE_COLORS, filterNotes, formatNoteDate, isEmptyNote, sortNotes } from "./model.js";
 
 // ===================== Розмітка =====================
@@ -101,6 +102,7 @@ export function mountNotes(container) {
   const findNote = (id) => notes()?.find((note) => note.id === id) || null;
 
   container.innerHTML = html`
+    ${workspaceTabs("notes")}
     <div data-head></div>
     <div class="notes-toolbar">
       <label class="notes-search">

@@ -384,3 +384,63 @@
 #app > main {
     flex: 1;
 }
+
+/* ---------- Перемикач усередині розділу (Notatki | Makra VBA) ---------- */
+
+.subnav {
+    display: inline-flex;
+    gap: 4px;
+    margin-top: 24px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+}
+
+.subnav a {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 14px;
+    border-radius: 9px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    transition: color 0.15s, background-color 0.15s;
+}
+
+.subnav a:hover {
+    color: var(--text);
+    background: var(--surface-2);
+}
+
+.subnav a[aria-current] {
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+.subnav .icon {
+    width: 17px;
+    height: 17px;
+}
+
+.subnav + .page-head,
+.subnav + [data-head] .page-head {
+    padding-top: 18px;
+}
+
+@media (max-width: 760px) {
+    .subnav {
+        display: flex;
+        margin-top: 16px;
+    }
+
+    .subnav a {
+        flex: 1;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 6px;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+}

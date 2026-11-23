@@ -18,6 +18,8 @@
   "nav.team": "Команда",
   "nav.notes": "Нотатки",
   "nav.scripts": "Макроси VBA",
+  "nav.links": "Посилання",
+  "nav.workspace": "Нотатки й макроси",
 
   "common.refresh": "Оновити",
   "common.loading": "Завантаження даних з таблиці…",

@@ -1,6 +1,7 @@
 // Точка входу: шапка сайту, перемикач мови і маршрути між сторінками.
 //
-// Маршрути (hash): #/trucks (за замовчуванням), #/team, #/notes, #/scripts, #/scripts/<файл>.
+// Маршрути (hash): #/trucks (за замовчуванням), #/team, #/notes, #/scripts, #/scripts/<файл>, #/links.
+// Нотатки, макроси й посилання — одна вкладка меню «Notatki i makra» з перемикачем усередині.
 // Старі посилання виду #StolPaletB3.txt теж працюють.
 // Код кожної сторінки завантажується лише тоді, коли її відкривають.
 
@@ -34,6 +35,18 @@ const PAGES = [
     labelKey: "nav.scripts",
     load: () => import("./pages/scripts/view.js").then((m) => (view, route) => m.mountScripts(view, route.file)),
   },
+  {
+    id: "links",
+    labelKey: "nav.links",
+    load: () => import("./pages/links/view.js").then((m) => (view) => m.mountLinks(view)),
+  },
+];
+
+// Вкладки меню. pages — які сторінки підсвічують вкладку.
+const NAV = [
+  { id: "trucks", labelKey: "nav.trucks", pages: ["trucks"] },
+  { id: "team", labelKey: "nav.team", pages: ["team"] },
+  { id: "notes", labelKey: "nav.workspace", pages: ["notes", "scripts", "links"] },
 ];
 
 function parseRoute() {
@@ -80,9 +93,9 @@ function header(route) {
     <div class="header-inner">
       <a class="brand" href="#/trucks" aria-label="INB Hermes"><span class="brand-mark">INB</span><span class="brand-name">Hermes</span></a>
       <nav class="main-nav" aria-label="${t("nav.label")}">
-        ${PAGES.map(
-          (page) => html`<a href="#/${page.id}" ${route.page === page.id ? html`aria-current="page"` : ""}>
-            ${icon(page.id)}<span>${t(page.labelKey)}</span>
+        ${NAV.map(
+          (item) => html`<a href="#/${item.id}" ${item.pages.includes(route.page) ? html`aria-current="page"` : ""}>
+            ${icon(item.id)}<span>${t(item.labelKey)}</span>
           </a>`,
         )}
       </nav>

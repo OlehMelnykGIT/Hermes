@@ -18,6 +18,8 @@
   "nav.team": "Zespół",
   "nav.notes": "Notatki",
   "nav.scripts": "Makra VBA",
+  "nav.links": "Linki",
+  "nav.workspace": "Notatki i makra",
 
   "common.refresh": "Odśwież",
   "common.loading": "Ładowanie danych z arkusza…",
