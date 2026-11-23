@@ -376,6 +376,54 @@
     }
 }
 
-.kpis + .table-wrap {
-    margin-top: 14px;
+/* Підсумки дати NCG у заголовку секції */
+.ncg-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.pill strong {
+    color: var(--text);
+}
+
+.pill .icon {
+    width: 13px;
+    height: 13px;
+}
+
+.pill--alert {
+    border-color: color-mix(in srgb, var(--red-fg) 40%, var(--line));
+    background: var(--red-bg);
+    color: var(--red-fg);
+}
+
+.pill--alert strong {
+    color: var(--red-fg);
+}
+
+.pill--ok {
+    color: var(--green-fg);
+}
+
+@media (max-width: 760px) {
+    .ncg-pills {
+        width: 100%;
+        margin-left: 0;
+    }
 }

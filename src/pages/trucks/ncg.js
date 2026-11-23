@@ -131,3 +131,35 @@ export function sortNcg(items, sort) {
   if (sort !== "deadline") return items;
   return [...items].sort((a, b) => (a.date?.getTime() ?? Infinity) - (b.date?.getTime() ?? Infinity));
 }
+
+// ===================== Групи за датою =====================
+// NCG групуємо за календарною датою з колонки Data, а не за days / «Zakończ dzień»
+// (кнопка завершення дня для NCG не використовується).
+
+const pad = (n) => String(n).padStart(2, "0");
+export const dateKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+// → [{ key: "2026-11-23" | null, date, items, summary, current }]
+// Найновіша дата зверху, «Bez daty» (key: null) — в кінці.
+// current — сьогоднішня дата (або новіша); якщо такої немає — найновіша група з датою.
+export function groupNcgByDate(items, now = new Date()) {
+  const groups = new Map();
+  for (const item of items) {
+    const key = item.date ? dateKey(item.date) : null;
+    if (!groups.has(key)) groups.set(key, { key, date: item.date, items: [] });
+    groups.get(key).items.push(item);
+  }
+  const dated = [...groups.values()].filter((g) => g.key !== null).sort((a, b) => b.key.localeCompare(a.key));
+  const today = dateKey(now);
+  const hasCurrent = dated.some((g) => g.key >= today);
+  const result = dated.map((g, i) => ({
+    ...g,
+    summary: summarizeNcg(g.items),
+    current: hasCurrent ? g.key >= today : i === 0,
+  }));
+  if (groups.has(null)) {
+    const g = groups.get(null);
+    result.push({ ...g, date: null, summary: summarizeNcg(g.items), current: false });
+  }
+  return result;
+}

@@ -308,3 +308,29 @@ describe("NCG", () => {
     assert.deepEqual(ncg.normalizeNcg([]).items, []);
   });
 });
+
+describe("NCG: групи за датою з колонки Data", () => {
+  const head = ["Typ", "Data", "Palety", "Puste palety", "Do LU"];
+  const { items } = ncg.normalizeNcg([
+    head,
+    ["Rozładunek", "22.11.2026 12:00", "32", "32", "FALSE"],
+    ["Przyjęcie", "23.11.2026 08:00", "18", "", "TRUE"],
+    ["Rozładunek", "", "5", "", "FALSE"],
+    ["Przyjęcie", "23.11.2026 23:59", "20", "", "FALSE"],
+  ]);
+
+  test("найновіша дата зверху, «Bez daty» в кінці, підсумки окремо", () => {
+    const groups = ncg.groupNcgByDate(items, new Date(2026, 10, 23, 10, 0));
+    assert.deepEqual(groups.map((g) => g.key), ["2026-11-23", "2026-11-22", null]);
+    assert.deepEqual(groups.map((g) => g.current), [true, false, false]);
+    assert.equal(groups[0].summary.byType.receipt.pallets, 38);
+    assert.equal(groups[0].summary.notInLu, 1);
+    assert.equal(groups[1].summary.emptyPallets, 32);
+    assert.equal(groups[2].items.length, 1);
+  });
+
+  test("сьогодні доставок немає — розгорнута найновіша дата", () => {
+    const groups = ncg.groupNcgByDate(items, new Date(2026, 10, 25));
+    assert.deepEqual(groups.map((g) => g.current), [true, false, false]);
+  });
+});

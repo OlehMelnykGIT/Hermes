@@ -1,9 +1,10 @@
-// Блок «NCG» на сторінці «Rozładunek»: підсумки доставок і таблиця (лише читання).
+// Блок «NCG» на сторінці «Rozładunek»: доставки, згруповані за датою з колонки Data,
+// з підсумками кожної дати (лише читання).
 
 import { t } from "../../i18n/index.js";
 import { html } from "../../lib/html.js";
 import { emptyState, icon } from "../../lib/ui.js";
-import { normalizeNcg, sortNcg, summarizeNcg } from "./ncg.js";
+import { groupNcgByDate, normalizeNcg, sortNcg } from "./ncg.js";
 
 // Порядок колонок; показуємо лише ті, що є в заголовку аркуша.
 // «place» — брама для Rozładunek, bufor для Przyjęcie (брами там немає).
@@ -76,39 +77,45 @@ function table(items, columns) {
   </div>`;
 }
 
-function kpis(summary) {
-  const { byType } = summary;
-  const typeKpi = (type) => html`<article class="kpi">
-    <span class="kpi-label"><span class="dot ncg-type--${type}" aria-hidden="true"></span>${t("ncg.kpi.pallets")} · ${t(`ncg.type.${type}`)}</span>
-    <strong class="kpi-value">${byType[type].pallets}</strong>
-    <span class="kpi-sub">${t("ncg.kpi.deliveries", { n: byType[type].deliveries })}</span>
-  </article>`;
+// «Pon 23.11» — короткий день тижня з перекладів (ncg.weekdays: від неділі).
+function dateTitle(group) {
+  if (!group.date) return t("ncg.noDate");
+  const weekdays = t("ncg.weekdays").split(",");
+  const d = group.date;
+  return `${weekdays[d.getDay()] ?? ""} ${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
 
-  return html`<section class="kpis kpis--compact">
-    <article class="kpi">
-      <span class="kpi-label">${icon("trucks")}${t("ncg.kpi.total")}</span>
-      <strong class="kpi-value">${summary.deliveries}</strong>
-      <span class="kpi-sub">
-        ${t("ncg.type.unloading")}: ${byType.unloading.deliveries} · ${t("ncg.type.receipt")}: ${byType.receipt.deliveries}
-      </span>
-    </article>
-    ${typeKpi("unloading")}
-    ${typeKpi("receipt")}
-    <article class="kpi">
-      <span class="kpi-label">${t("ncg.kpi.empty")}</span>
-      <strong class="kpi-value">${summary.emptyPallets}</strong>
-      <span class="kpi-sub">${t("ncg.kpi.exchanges", { n: summary.exchanges })}</span>
-    </article>
-    <article class="kpi ${summary.notInLu > 0 ? "kpi--overdue" : ""}">
-      <span class="kpi-label">${icon(summary.notInLu > 0 ? "alert" : "check")}${t("ncg.notInLu")}</span>
-      <strong class="kpi-value">${summary.notInLu}</strong>
-      <span class="kpi-sub">${summary.notInLu > 0 ? t("ncg.kpi.notInLuHint") : t("ncg.kpi.allInLu")}</span>
-    </article>
-  </section>`;
+// Підсумки дати — плашки в заголовку секції.
+function dateSummary({ byType, emptyPallets, notInLu }) {
+  const typePill = (type) => html`<span class="pill" title="${t("ncg.kpi.pallets")} · ${t(`ncg.type.${type}`)}">
+    <span class="dot ncg-type--${type}" aria-hidden="true"></span>${t(`ncg.type.${type}`)}: <strong>${t("ncg.day.pallets", { n: byType[type].pallets })}</strong>
+  </span>`;
+  return html`<span class="ncg-pills">
+    ${typePill("unloading")}
+    ${typePill("receipt")}
+    <span class="pill">${t("ncg.kpi.empty")}: <strong>${emptyPallets}</strong></span>
+    ${notInLu > 0
+      ? html`<span class="pill pill--alert">${icon("alert")}${t("ncg.notInLu")}: <strong>${notInLu}</strong></span>`
+      : html`<span class="pill pill--ok">${icon("check")}${t("ncg.day.allInLu")}</span>`}
+  </span>`;
+}
+
+// openState — Map(ключ дати → true/false): що користувач сам розгорнув чи згорнув.
+function dateSection(group, columns, sort, openState) {
+  const id = group.key ?? "none";
+  const open = openState.get(id) ?? group.current;
+  return html`<details class="panel day ncg-day" data-ncg-day="${id}" ${open ? html`open` : ""}>
+    <summary>
+      <strong>${dateTitle(group)}</strong>
+      <span class="muted">${t("ncg.day.deliveries", { n: group.items.length })}</span>
+      ${dateSummary(group.summary)}
+    </summary>
+    <div class="day-body">${table(sortNcg(group.items, sort), columns)}</div>
+  </details>`;
 }
 
 // rows — поле ncg з API (перший рядок — заголовки) або null, якщо Api.gs його не віддає.
-export function ncgSection(rows, sort) {
+export function ncgSection(rows, sort, openState = new Map()) {
   if (!rows) return "";
   const { items, columns: present } = normalizeNcg(rows);
   const columns = COLUMNS.filter((column) => hasColumn(column, present));
@@ -118,5 +125,5 @@ export function ncgSection(rows, sort) {
     </div>
     ${items.length === 0
       ? emptyState(t("ncg.empty"), "trucks")
-      : html`${kpis(summarizeNcg(items))}${table(sortNcg(items, sort), columns)}`}`;
+      : html`<div class="days">${groupNcgByDate(items).map((g) => dateSection(g, columns, sort, openState))}</div>`}`;
 }

@@ -303,6 +303,7 @@ export function mountTrucks(container) {
   let filter = "all";
   let legendOpen = load("trucks.legend", "0") === "1";
   const openDays = new Set(); // розгорнуті закриті дні (у межах відкритої сторінки)
+  const ncgOpen = new Map(); // дата NCG → розгорнута чи ні (якщо користувач змінив)
   let animate = true; // плавна поява лише при першому показі даних
 
   function content() {
@@ -334,7 +335,7 @@ export function mountTrucks(container) {
       </div>
       ${table(sortItems(visible, sort), FBO_COLUMNS, now, emptyText)}
       ${groups && closedDays(groups, sheet.data.stats, openDays, now)}
-      ${ncgSection(sheet.data.ncg, sort)}
+      ${ncgSection(sheet.data.ncg, sort, ncgOpen)}
     </div>`;
   }
 
@@ -379,6 +380,8 @@ export function mountTrucks(container) {
     } else if (details.matches("[data-day]")) {
       if (details.open) openDays.add(details.dataset.day);
       else openDays.delete(details.dataset.day);
+    } else if (details.matches("[data-ncg-day]")) {
+      ncgOpen.set(details.dataset.ncgDay, details.open);
     }
   }
 
