@@ -57,13 +57,18 @@ export function currentDayStats(stats, days) {
   return statsForDay(stats, current) || { dayId: null, day: null, druk: 0, lu: 0 };
 }
 
-// Записи з повним dayId (момент відкриття) — останні n днів у хронологічному порядку
-// (для графіка: старші ліворуч). Старі записи лише з датою не беруться.
+// Попередні дні для карток Replen / Stol B3: записи з повним dayId (момент відкриття),
+// крім поточного дня, найновіші першими, не більше n. Старі записи лише з датою не беруться.
+// nr — номер дня з days (якщо день ще є в списку днів), інакше null.
 const FULL_ID = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 
-export function recentStats(stats, n = 14) {
+export function previousStats(stats, days, currentId, n = 4) {
   if (!Array.isArray(stats)) return [];
-  return stats.filter((entry) => FULL_ID.test(entry.dayId || "")).slice(0, n).reverse();
+  const nrById = new Map((Array.isArray(days) ? days : []).map((day) => [day.id, day.nr]));
+  return stats
+    .filter((entry) => FULL_ID.test(entry.dayId || "") && entry.dayId !== currentId)
+    .slice(0, n)
+    .map((entry) => ({ ...entry, nr: nrById.get(entry.dayId) ?? null }));
 }
 
 // «2026-11-24T06:02:00» → «24.11.2026 06:02» (час Варшави, як у таблиці — без перерахунку поясів).

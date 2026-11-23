@@ -1,7 +1,6 @@
 // Сторінка «Rozładunek»: показники дня, фільтр статусів, таблиця FBO і блок NCG (ncgView.js).
 
 import { formatDuration, formatTime, t } from "../../i18n/index.js";
-import { barChart } from "../../lib/barChart.js";
 import { html } from "../../lib/html.js";
 import { refresh, subscribe } from "../../lib/sheet.js";
 import { load, save } from "../../lib/storage.js";
@@ -34,10 +33,9 @@ import {
 import {
   currentDayStats,
   formatSheetDateTime,
-  formatShortDay,
   formatShortDayTime,
   groupByDays,
-  recentStats,
+  previousStats,
   statsForDay,
   visibleClosedDays,
 } from "./days.js";
@@ -181,34 +179,43 @@ function kpis(items, euro, now) {
   </section>`;
 }
 
-// Картки «Wydrukowane palety» і «Przypisane LU»: значення за поточний день + графік останніх днів.
-const CHART_DAYS = 14;
+// Картки «Replen» і «Stol B3»: значення за поточний день + підписаний список попередніх днів
+// (день, дата відкриття, смужка відносно найбільшого значення, число).
+const HISTORY_DAYS = 4;
+
+function history(entries, key, todayValue) {
+  if (entries.length === 0) return "";
+  const max = Math.max(todayValue, ...entries.map((entry) => entry[key]), 1);
+  return html`<div class="stats-history">
+    <span class="stats-history-title">${t("trucks.stats.previous")}</span>
+    <ul>
+      ${entries.map(
+        (entry) => html`<li>
+          <span class="stats-history-day">
+            ${entry.nr !== null && html`<strong>${t("trucks.day.title", { nr: entry.nr })}</strong>`}
+            <span class="muted">${formatShortDayTime(entry.dayId)}</span>
+          </span>
+          <span class="stats-history-bar" aria-hidden="true"><i data-width="${(entry[key] / max) * 100}"></i></span>
+          <strong class="stats-history-value">${entry[key]}</strong>
+        </li>`,
+      )}
+    </ul>
+  </div>`;
+}
 
 function statsCards(stats, days) {
   const today = currentDayStats(stats, days);
   if (!today) return ""; // Api.gs ще не віддає stats
-  const points = recentStats(stats, CHART_DAYS);
+  const previous = previousStats(stats, days, today.dayId ?? days?.find((day) => day.open)?.id, HISTORY_DAYS);
 
-  const card = (key, iconName, title) => html`<article class="kpi kpi--chart">
+  const card = (key, iconName, title) => html`<article class="kpi kpi--stats-card">
     <span class="kpi-label">${icon(iconName)}${title}</span>
     <strong class="kpi-value">${today[key]}</strong>
     <span class="kpi-sub">${t(`trucks.stats.${key}Unit`)}</span>
     <span class="kpi-sub">
       ${today.dayId ? t("trucks.stats.since", { date: formatShortDayTime(today.dayId) }) : t("trucks.stats.noneToday")}
     </span>
-    ${points.length > 1 &&
-    barChart(
-      points.map((point) => ({
-        label: formatShortDayTime(point.dayId),
-        value: point[key],
-        current: point.dayId === today.dayId, // виділяємо саме поточний день (за id), а не останній стовпчик
-      })),
-      {
-        title,
-        firstLabel: formatShortDay(points[0].dayId),
-        lastLabel: formatShortDay(points[points.length - 1].dayId),
-      },
-    )}
+    ${history(previous, key, today[key])}
   </article>`;
 
   return html`<section class="kpis kpis--stats">

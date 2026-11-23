@@ -73,6 +73,7 @@
   "trucks.stats.luUnit": "LU з призначеним місцем",
   "trucks.stats.since": "Поточний день (від {date})",
   "trucks.stats.noneToday": "Поточний день — ще немає даних",
+  "trucks.stats.previous": "Попередні дні",
   "trucks.progress": "Пройдено: {steps}",
   "trucks.progressInherited": "Попередня зміна: {steps}",
   "trucks.inherited": "Від попередньої зміни",

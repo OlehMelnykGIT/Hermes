@@ -73,6 +73,7 @@
   "trucks.stats.luUnit": "LU z przypisanym miejscem",
   "trucks.stats.since": "Bieżący dzień (od {date})",
   "trucks.stats.noneToday": "Bieżący dzień — jeszcze brak danych",
+  "trucks.stats.previous": "Poprzednie dni",
   "trucks.progress": "Postęp: {steps}",
   "trucks.progressInherited": "Poprzednia zmiana: {steps}",
   "trucks.inherited": "Od poprzedniej zmiany",

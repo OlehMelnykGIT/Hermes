@@ -246,13 +246,19 @@ describe("Робочі дні і статистика", () => {
     assert.equal(days.currentDayStats(undefined, dayList), null);
   });
 
-  test("графік: лише записи з повним dayId, у хронологічному порядку", () => {
+  test("попередні дні: без поточного, лише повний dayId, найновіші першими, з номером дня", () => {
     const stats = [
-      { dayId: "2026-11-23T06:10:00", day: "2026-11-23", druk: 1, lu: 1 },
+      { dayId: "2026-11-23T12:48:20", day: "2026-11-23", druk: 0, lu: 169 },
+      { dayId: "2026-11-23T10:15:29", day: "2026-11-23", druk: 80, lu: 170 },
       { dayId: "2026-11-22T22:05:00", day: "2026-11-22", druk: 2, lu: 2 },
       { dayId: "2026-11-21", day: "2026-11-21", druk: 3, lu: 3 },
     ];
-    assert.deepEqual(days.recentStats(stats).map((s) => s.dayId), ["2026-11-22T22:05:00", "2026-11-23T06:10:00"]);
+    const dayList = [
+      { id: "2026-11-23T10:15:29", nr: 1, fromRow: 2, toRow: 10, open: false },
+      { id: "2026-11-23T12:48:20", nr: 2, fromRow: 11, toRow: 19, open: true },
+    ];
+    const previous = days.previousStats(stats, dayList, "2026-11-23T12:48:20");
+    assert.deepEqual(previous.map((s) => [s.dayId, s.nr]), [["2026-11-23T10:15:29", 1], ["2026-11-22T22:05:00", null]]);
   });
 
   test("формати дат", () => {
