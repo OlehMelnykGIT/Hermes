@@ -8,7 +8,7 @@
   "login.notConfigured": "Сервер не налаштовано: немає SITE_PASSWORD або SESSION_SECRET (мін. 32 символи).",
   "login.hint": "Сесія завершується через 12 годин. На спільному комп'ютері виходьте після роботи.",
 
-  "header.sheet": "Таблиця",
+  "header.sheetTitle": "Відкрити таблицю Replenishment SLA у Google Таблицях (нова вкладка)",
   "header.logout": "Вийти",
   "header.language": "Мова",
   "nav.label": "Головне меню",

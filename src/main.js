@@ -41,6 +41,21 @@ function parseRoute() {
 
 let config = null; // /api/config: посилання на таблицю; null — поки не завантажено або без входу
 
+// Назва Google Таблиці — це дані (власна назва), тому не перекладається.
+const SHEET_NAME = { lead: "Replenishment", tail: "SLA" };
+
+function sheetLink(url) {
+  return html`<a class="sheet-link" href="${url}" target="_blank" rel="noopener noreferrer"
+      title="${t("header.sheetTitle")}" aria-label="${t("header.sheetTitle")}">
+    <span class="sheet-icon" aria-hidden="true">${icon("sheet")}</span>
+    <span class="sheet-text">
+      <strong><span class="sheet-lead">${SHEET_NAME.lead} </span>${SHEET_NAME.tail}</strong>
+      <small>Google Sheets</small>
+    </span>
+    ${icon("external", "icon sheet-ext")}
+  </a>`;
+}
+
 function header(route) {
   return html`<header class="site-header">
     <div class="header-inner">
@@ -58,10 +73,7 @@ function header(route) {
             ({ code, label }) => html`<button type="button" data-lang="${code}" aria-pressed="${code === getLang()}">${label}</button>`,
           )}
         </div>
-        ${config?.sheetUrl &&
-        html`<a class="button" href="${config.sheetUrl}" target="_blank" rel="noopener noreferrer">
-          ${t("header.sheet")}${icon("external")}
-        </a>`}
+        ${config?.sheetUrl && sheetLink(config.sheetUrl)}
         ${config && html`<form method="post" action="/logout"><button class="button" type="submit">${t("header.logout")}</button></form>`}
       </div>
     </div>

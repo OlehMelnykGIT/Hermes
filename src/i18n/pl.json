@@ -8,7 +8,7 @@
   "login.notConfigured": "Serwer nie jest skonfigurowany: brak SITE_PASSWORD lub SESSION_SECRET (min. 32 znaki).",
   "login.hint": "Sesja wygasa po 12 godzinach. Na wspólnym komputerze wyloguj się po pracy.",
 
-  "header.sheet": "Arkusz",
+  "header.sheetTitle": "Otwórz arkusz Replenishment SLA w Google Sheets (nowa karta)",
   "header.logout": "Wyloguj",
   "header.language": "Język",
   "nav.label": "Menu główne",

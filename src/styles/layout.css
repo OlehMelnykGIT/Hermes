@@ -120,6 +120,63 @@
     margin: 0;
 }
 
+/* Посилання на Google Таблицю «Replenishment SLA» */
+.sheet-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 4px 10px 4px 4px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: var(--surface);
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+
+.sheet-link:hover {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-hover);
+}
+
+.sheet-link:active {
+    transform: scale(0.98);
+}
+
+.sheet-icon {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: var(--green-bg);
+    color: var(--green-fg);
+}
+
+.sheet-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.sheet-text strong {
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.sheet-text small {
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.sheet-ext {
+    width: 15px;
+    height: 15px;
+    color: var(--muted);
+}
+
+.sheet-link:hover .sheet-ext {
+    color: var(--accent);
+}
+
 .lang-switch {
     display: flex;
     padding: 3px;
@@ -253,5 +310,16 @@
 
     .header-actions .button {
         padding: 7px 10px;
+    }
+
+    /* На вузькому екрані — лише іконка і «SLA» */
+    .sheet-lead,
+    .sheet-text small {
+        display: none;
+    }
+
+    .sheet-link {
+        gap: 7px;
+        padding-right: 8px;
     }
 }
